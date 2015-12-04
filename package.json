@@ -1,0 +1,21 @@
+{
+  "name": "infc",
+  "version": "0.0.0",
+  "license": "GPL-1.0",
+  "description": "http util",
+  "repository": {
+    "type": "git",
+    "url": "foo.git"
+  },
+  "main": "infc.js",
+  "devDependencies": {
+  },
+  "optional": false,
+  "dependencies": {
+    "express": "~4.8"
+  },
+  "scripts": {
+    "test": "node infc.js -t"
+  },
+  "author": "Jon Bardin"
+}
