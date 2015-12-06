@@ -35,6 +35,7 @@ var crypto = require('crypto');
 var spawn = require('child_process').spawn;
 var path = require('path');
 var fs = require('fs');
+var es = require('event-stream');
 var Promise = require('es6-promise').Promise;
 var express = require('express');
 
@@ -162,39 +163,66 @@ shaCheckingProcess.stderr.on('data', function (data) {
   console.log('sha stderr: ' + data);
 });
 
-var loadWatchFolders = new Promise(function(resolve, reject) {
-  fs.readFile(config['-f'], 'utf8', function (err, data) {
-    if (err) { reject(err); }
-    resolve(data.split("\n").filter(function(element, index, array) {
-      return !(null === element || 0 === element.length);
-    }));
+
+var promiseToListFolderfilesToSync = function() {
+  return new Promise(function(resolve, reject) {
+    fs.readFile(config['-f'], 'utf8', function (err, data) {
+      if (err) { reject(err); }
+      resolve(data.split("\n").filter(function(element, index, array) {
+        return !(null === element || 0 === element.length);
+      }));
+    });
   });
-});
+};
 
 var loadIndexHtml = new Promise(function(resolve, reject) {
   fs.readFile('public/index.html', function(err, data) {
     if (err) { reject(err); }
     resolve(data);
   });
-
 });
-
 
 //??? spawn('/usr/bin/open', ['http://' + config['-h'] + ':' + config['-p'] + '/']);
 //Promise.all(arrayOfPromises).then(function(arrayOfResults)
 
 var promiseToListAllFilesToSync = function() {
-  return new Promise(function(resolve, reject) {
+  var allFilesToSync = [];
+  var allFileListingProcessPromises = [];
 
-    var shaCheckingProcess = spawn("shasum", ["-c", "-"]);
+  //return new Promise(function(resolve, reject) {
 
-    shaCheckingProcess.stdout.on('data', function (data) {
-      console.log('sha stdout: ' + data);
+    return promiseToListFolderfilesToSync().then(function(foldersToSync) {
+      console.log(foldersToSync);
+      foldersToSync.forEach(function(folderToSync) {
+        var fileListingProcessPromise = new Promise(function(res, rej) {
+          console.log("asd", folderToSync);
+          var fileListingProcess = spawn("find", ["-f", folderToSync]);
+          fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
+            console.log('Got the following message:', data);
+            allFilesToSync.push(data);
+            cb(null);
+          }));
+          console.log("foo");
+          fileListingProcess.stdout.on('close', function(err) {
+            if (err) { rej(err); }
+            res();
+          });
+        });
+        allFileListingProcessPromises.push(fileListingProcessPromise);
+      });
+      //.catch(function(err) {
+      //  console.log(err);
+      //});
+      return Promise.all(allFileListingProcessPromises).then(function() {
+        //console.log("123", allFilesToSync);
+        return Promise.resolve(allFilesToSync);
+      });
+      //.then(function() {
+      //  console.log("asdasd");
+      //  resolve(allFilesToSync);
+      //});
     });
-
-    shaCheckingProcess.stderr.on('data', function (data) {
-    
-  });
+  //});
 };
 
 var promiseToListenForHttpRequests = function() {
@@ -262,6 +290,10 @@ sequence.then(function() {
   return promiseToCreateStaticFileCabinetDirectory();
 }).then(function() {
   return promiseToListenForHttpRequests();
+}).then(function() {
+  return promiseToListAllFilesToSync();
+}).then(function(allFiles) {
+  console.log("allfiles", allFiles);
 }).catch(function(err) {
   console.log(err);
 });
