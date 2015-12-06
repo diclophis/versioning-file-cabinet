@@ -24,14 +24,19 @@
           abc123 => ../DROPBOX
 
     infc.gif => .infc/VERSIONS/infc.gif/abc123
+
+
+locate public
+mkdir -p public/.sfc
+
 */
 
 var crypto = require('crypto');
 var spawn = require('child_process').spawn;
 var path = require('path');
 var fs = require('fs');
-var express = require('express'),
-    app = express();
+var Promise = require('es6-promise').Promise;
+var express = require('express');
 
 var poppingConfig = null;
 var config = {};
@@ -53,7 +58,33 @@ config['-f'] = config['-f'] || 'Folderfile';
 config['-h'] = config['-h'] || 'localhost';
 config['-c'] = null;
 
-console.log(config);
+//console.log(config);
+
+var promiseToSetResolvedFolderfilePath = function() {
+  return new Promise(function(resolve, reject) {
+    fs.realpath(config['-f'], function(err, fullFolderfilePath) {
+      if (err) { reject(err); }
+      config['resolvedFolerfileDirname'] = path.dirname(fullFolderfilePath);
+      resolve(fullFolderfilePath);
+    });
+  });
+};
+
+var promiseToCreateStaticFileCabinetDirectory = function() {
+  return new Promise(function(resolve, reject) {
+    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/public/.sfc";
+    fs.access(config['staticFileCabinetDirectory'], fs.R_OK | fs.W_OK, function (err) {
+      if (err) {
+        fs.mkdir(config['staticFileCabinetDirectory'], function(err) {
+          if (err) { reject(err); }
+          resolve(config['staticFileCabinetDirectory']);
+        });
+      } else {
+        resolve(config['staticFileCabinetDirectory']);
+      }
+    });
+  });
+};
 
 var checksum = function(str, algorithm, encoding) {
   return crypto.createHash(algorithm || 'md5').update(str, 'utf8').digest(encoding || 'hex');
@@ -131,65 +162,109 @@ shaCheckingProcess.stderr.on('data', function (data) {
   console.log('sha stderr: ' + data);
 });
 
-fs.readFile(config['-f'], 'utf8', function (err, data) {
-  if (err) { throw err; }
-
-  createWatchesFromFoldersBlock(data.split("\n").filter(function(element, index, array) {
-    return !(null === element || 0 === element.length);
-  }));
-});
-
-app.use(function(req, res, next) {
-  var isRoot = '/' === req.path;
-  var isInterfaceJavascript = '' === req.query.interfaceJavascript;
-  console.log(req.path, req.query.interface, isInterfaceJavascript, app.get('env'));
-
-  var redirectToIndexHtml = isRoot && app.get('env') != 'development' && !isInterfaceJavascript;
-  var respondWithInterfaceHtml = isRoot && app.get('env') === 'development' && !isInterfaceJavascript;
-
-  if (redirectToIndexHtml) {
-    res.redirect('/index.html');
-  } else if (respondWithInterfaceHtml) {
-    fs.readFile('public/index.html', function(err, data) {
-      if (err) { throw err; }
-    
-      res.set('Content-Type', 'text/html');
-      res.send(data);
-    });
-  } else if (isInterfaceJavascript) {
-    if ('development' === app.get('env')) {
-      res.set('Content-Type', 'text/javascript');
-      res.send('(' + createClientInterface.toString() + ')();');
-    } else {
-      res.end();
-    }
-  } else {
-    next();
-  }
-});
-
-app.get('/stream', function(req, res) {
-  if (config['-c']) {
-    config['-c'].end();
-  }
-  config['-c'] = res;
-
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
+var loadWatchFolders = new Promise(function(resolve, reject) {
+  fs.readFile(config['-f'], 'utf8', function (err, data) {
+    if (err) { reject(err); }
+    resolve(data.split("\n").filter(function(element, index, array) {
+      return !(null === element || 0 === element.length);
+    }));
   });
-  res.write('\n');
-
-  req.on("close", function() { });
 });
 
-app.use(function(req, res, next) {
-  console.log("clerk tasks here: " + req.path);
-  //var sentToCheck = shaCheckingProcess.stdin.write("/Users/mavenlink/Downloads/" + req.path + "\r\n");
+var loadIndexHtml = new Promise(function(resolve, reject) {
+  fs.readFile('public/index.html', function(err, data) {
+    if (err) { reject(err); }
+    resolve(data);
+  });
+
 });
 
-app.use(express.static(path.dirname(config['-f']) + '/public'));
-app.listen(config['-p']);
 
 //??? spawn('/usr/bin/open', ['http://' + config['-h'] + ':' + config['-p'] + '/']);
+//Promise.all(arrayOfPromises).then(function(arrayOfResults)
+
+var promiseToListAllFilesToSync = function() {
+  return new Promise(function(resolve, reject) {
+
+    var shaCheckingProcess = spawn("shasum", ["-c", "-"]);
+
+    shaCheckingProcess.stdout.on('data', function (data) {
+      console.log('sha stdout: ' + data);
+    });
+
+    shaCheckingProcess.stderr.on('data', function (data) {
+    
+  });
+};
+
+var promiseToListenForHttpRequests = function() {
+  return new Promise(function(resolve, reject) {
+    app = express();
+
+    app.use(function(req, res, next) {
+      var isRoot = '/' === req.path;
+      var isInterfaceJavascript = '' === req.query.interfaceJavascript;
+      console.log(req.path, req.query.interface, isInterfaceJavascript, app.get('env'));
+
+      var redirectToIndexHtml = isRoot && app.get('env') != 'development' && !isInterfaceJavascript;
+      var respondWithInterfaceHtml = isRoot && app.get('env') === 'development' && !isInterfaceJavascript;
+
+      if (redirectToIndexHtml) {
+        res.redirect('/index.html');
+      } else if (respondWithInterfaceHtml) {
+        loadIndexHtml.then(function(data) {
+          res.set('Content-Type', 'text/html');
+          res.send(data);
+        });
+      } else if (isInterfaceJavascript) {
+        if ('development' === app.get('env')) {
+          res.set('Content-Type', 'text/javascript');
+          res.send('(' + createClientInterface.toString() + ')();');
+        } else {
+          res.end();
+        }
+      } else {
+        next();
+      }
+    });
+
+    app.get('/stream', function(req, res) {
+      if (config['-c']) {
+        config['-c'].end();
+      }
+      config['-c'] = res;
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      });
+      res.write('\n');
+
+      req.on("close", function() { });
+    });
+
+    app.use(function(req, res, next) {
+      console.log("clerk tasks here: " + req.path);
+      //var sentToCheck = shaCheckingProcess.stdin.write("/Users/mavenlink/Downloads/" + req.path + "\r\n");
+    });
+
+    app.use(express.static(path.dirname(config['-f']) + '/public'));
+
+    resolve(app.listen(config['-p']));
+  });
+};
+
+var sequence = Promise.resolve();
+sequence.then(function() {
+  return promiseToSetResolvedFolderfilePath();
+}).then(function() {
+  return promiseToCreateStaticFileCabinetDirectory();
+}).then(function() {
+  return promiseToListenForHttpRequests();
+}).catch(function(err) {
+  console.log(err);
+});
+
+//promiseToReturnResolvedFolderfilePath().then(
+//).
