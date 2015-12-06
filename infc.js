@@ -12,7 +12,6 @@
 // readlink
 //
 /*
-
   public/
     .ffc
       DELETED => /dev/null
@@ -39,7 +38,6 @@ var config = {};
 var messageCount = 0;
 
 process.argv.forEach(function (val, index, array) {
-  //console.log(index + ': ' + val);
   if (null === poppingConfig) {
     poppingConfig = 'infc.js';
   } else if (false === poppingConfig) {
@@ -143,11 +141,11 @@ fs.readFile(config['-f'], 'utf8', function (err, data) {
 
 app.use(function(req, res, next) {
   var isRoot = '/' === req.path;
-  var isInterfaceJavascript = '' === req.query.interfaceJavascript; //'/?javascript' === req.url;
+  var isInterfaceJavascript = '' === req.query.interfaceJavascript;
   console.log(req.path, req.query.interface, isInterfaceJavascript, app.get('env'));
 
   var redirectToIndexHtml = isRoot && app.get('env') != 'development' && !isInterfaceJavascript;
-  var respondWithInterfaceHtml = isRoot && app.get('env') == 'development' && !isInterfaceJavascript;
+  var respondWithInterfaceHtml = isRoot && app.get('env') === 'development' && !isInterfaceJavascript;
 
   if (redirectToIndexHtml) {
     res.redirect('/index.html');
@@ -176,7 +174,6 @@ app.get('/stream', function(req, res) {
   }
   config['-c'] = res;
 
-  //send headers for event-stream connection
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -184,24 +181,15 @@ app.get('/stream', function(req, res) {
   });
   res.write('\n');
 
-  // The 'close' event is fired when a user closes their browser window.
   req.on("close", function() { });
 });
-
-      //console.log("is link1", versionPath);
-      //var sentToCheck = shaCheckingProcess.stdin.write("0000000000000000000000000000000000000000  /Users/mavenlink/Downloads/001.gif\n");
-      //console.log(sentToCheck);
-      //next();
 
 app.use(function(req, res, next) {
   console.log("clerk tasks here: " + req.path);
   //var sentToCheck = shaCheckingProcess.stdin.write("/Users/mavenlink/Downloads/" + req.path + "\r\n");
-
 });
 
-// serve all files from public dir using built-in static file server
 app.use(express.static(path.dirname(config['-f']) + '/public'));
-
-var expressServer = app.listen(config['-p']);
+app.listen(config['-p']);
 
 //??? spawn('/usr/bin/open', ['http://' + config['-h'] + ':' + config['-p'] + '/']);
