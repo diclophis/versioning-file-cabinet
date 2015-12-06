@@ -116,14 +116,16 @@ var createClientInterface = function() {
   var source = new EventSource("/stream");
   source.addEventListener("message", function(e){
     console.log(e.data);
+    var linkToFilePara = document.createElement('p');
     var linkToFile = document.createElement('a');
+    linkToFilePara.appendChild(linkToFile);
     linkToFile.href = e.data;
-    linkToFile.innerText = e.data;
-    document.body.appendChild(linkToFile);
+    linkToFile.textContent = e.data;
+    document.body.appendChild(linkToFilePara);
   }, false);
 };
 
-var createWatchesFromFoldersBlock = function(validDirsToWatch) {
+var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
   validDirsToWatch.forEach(function(validDir, index, array) {
     console.log('watching: ' + validDir);
     fs.watch(validDir, function (event, filename) {
@@ -137,12 +139,17 @@ var createWatchesFromFoldersBlock = function(validDirsToWatch) {
 
         console.log('filename provided: ' + filename);
 
+        /*
         if (config['-c']) {
-          config['-c'].write('id: ' + messageCount + '\n');
-          config['-c'].write("data: " + filename + '\n\n'); // Note the extra newline
-          messageCount = messageCount + 1;
+          //config['-c'].write('id: ' + messageCount + '\n');
+          //config['-c'].write("data: " + filename + '\n\n'); // Note the extra newline
+          //messageCount = messageCount + 1;
         } else {
           checkPathAndDo(filename); 
+        }
+        */
+        if ("function" === typeof(sendFile)) {
+          sendFile(filename);
         }
       } else {
         console.log('filename not provided');
@@ -163,13 +170,16 @@ shaCheckingProcess.stderr.on('data', function (data) {
   console.log('sha stderr: ' + data);
 });
 
+var stringPresent = function(str) {
+  return !(null === str || 0 === str.length);
+};
 
 var promiseToListFolderfilesToSync = function() {
   return new Promise(function(resolve, reject) {
     fs.readFile(config['-f'], 'utf8', function (err, data) {
       if (err) { reject(err); }
       resolve(data.split("\n").filter(function(element, index, array) {
-        return !(null === element || 0 === element.length);
+        return stringPresent(element);
       }));
     });
   });
@@ -188,41 +198,31 @@ var loadIndexHtml = new Promise(function(resolve, reject) {
 var promiseToListAllFilesToSync = function() {
   var allFilesToSync = [];
   var allFileListingProcessPromises = [];
-
-  //return new Promise(function(resolve, reject) {
-
-    return promiseToListFolderfilesToSync().then(function(foldersToSync) {
-      console.log(foldersToSync);
-      foldersToSync.forEach(function(folderToSync) {
-        var fileListingProcessPromise = new Promise(function(res, rej) {
-          console.log("asd", folderToSync);
-          var fileListingProcess = spawn("find", ["-f", folderToSync]);
-          fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
-            console.log('Got the following message:', data);
-            allFilesToSync.push(data);
-            cb(null);
-          }));
-          console.log("foo");
-          fileListingProcess.stdout.on('close', function(err) {
-            if (err) { rej(err); }
-            res();
-          });
+  return promiseToListFolderfilesToSync().then(function(foldersToSync) {
+    console.log(foldersToSync);
+    foldersToSync.forEach(function(folderToSync) {
+      var folderToSyncPrefix = path.basename(folderToSync);
+      var fileListingProcessPromise = new Promise(function(res, rej) {
+        var fileListingProcess = spawn("find", ["-f", folderToSync]);
+        fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
+          //console.log('Got the following message:', data);
+          if (stringPresent(data) && folderToSync != data) {
+            var canonFile = folderToSyncPrefix + data.replace(folderToSync, '');
+            allFilesToSync.push(canonFile);
+          }
+          cb(null);
+        }));
+        fileListingProcess.stdout.on('close', function(err) {
+          if (err) { rej(err); }
+          res();
         });
-        allFileListingProcessPromises.push(fileListingProcessPromise);
       });
-      //.catch(function(err) {
-      //  console.log(err);
-      //});
-      return Promise.all(allFileListingProcessPromises).then(function() {
-        //console.log("123", allFilesToSync);
-        return Promise.resolve(allFilesToSync);
-      });
-      //.then(function() {
-      //  console.log("asdasd");
-      //  resolve(allFilesToSync);
-      //});
+      allFileListingProcessPromises.push(fileListingProcessPromise);
     });
-  //});
+    return Promise.all(allFileListingProcessPromises).then(function() {
+      return Promise.resolve(allFilesToSync);
+    });
+  });
 };
 
 var promiseToListenForHttpRequests = function() {
@@ -257,10 +257,18 @@ var promiseToListenForHttpRequests = function() {
     });
 
     app.get('/stream', function(req, res) {
-      if (config['-c']) {
-        config['-c'].end();
-      }
-      config['-c'] = res;
+      sendFile = (function(eventStreamResponse) {
+        return function(filename) {
+          eventStreamResponse.write('id: ' + messageCount + '\n');
+          eventStreamResponse.write("data: " + filename + '\n\n'); // Note the extra newline
+          messageCount = messageCount + 1;
+        };
+      })(res);
+
+      //if (config['-c']) {
+      //  config['-c'].end();
+      //}
+      //config['-c'] = res;
 
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -270,6 +278,15 @@ var promiseToListenForHttpRequests = function() {
       res.write('\n');
 
       req.on("close", function() { });
+
+      promiseToListAllFilesToSync().then(function(allFiles) {
+        allFiles.forEach(function(interestingFile) {
+          sendFile(interestingFile);
+        });
+        return promiseToListFolderfilesToSync().then(function(foldersToSync) {
+          return promiseToWatchFilesFromFolders(foldersToSync, sendFile);
+        });
+      });
     });
 
     app.use(function(req, res, next) {
