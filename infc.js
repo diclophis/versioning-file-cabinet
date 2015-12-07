@@ -60,6 +60,7 @@ config['-p'] = config['-p'] || 3001;
 config['-f'] = config['-f'] || 'Folderfile';
 config['-h'] = config['-h'] || 'localhost';
 config['-c'] = null;
+config['publicDir'] = "public/";
 
 //console.log(config);
 
@@ -75,7 +76,7 @@ var promiseToSetResolvedFolderfilePath = function() {
 
 var promiseToCreateStaticFileCabinetDirectory = function() {
   return new Promise(function(resolve, reject) {
-    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/" + config['publicDir'] + ".sfc";
+    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/" + config['publicDir'] + ".sfc/";
 
     fs.access(config['staticFileCabinetDirectory'], fs.R_OK | fs.W_OK, function (err) {
       if (err) {
@@ -88,6 +89,14 @@ var promiseToCreateStaticFileCabinetDirectory = function() {
       }
     });
   });
+};
+
+var splitChars = function(txt, num) {
+  var result = [];
+  for (var i = 0; i < txt.length; i += num) {
+    result.push(txt.substr(i, num));
+  }
+  return result;
 };
 
 var checksum = function(str, algorithm, encoding) {
@@ -203,6 +212,37 @@ var promiseToListAllFilesToSync = function() {
   });
 };
 
+
+
+var promiseToCopyFile = function(source, target) {
+  return new Promise(function(resolve, reject) {
+    var cbCalled = false;
+    var done = function(err) {
+      if (!cbCalled) {
+        cbCalled = true;
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      }
+    };
+    var rd = fs.createReadStream(source);
+    rd.on("error", function(err) {
+      done(err);
+    });
+    var wr = fs.createWriteStream(target);
+    wr.on("error", function(err) {
+      done(err);
+    });
+    wr.on("close", function(ex) {
+      done();
+    });
+    rd.pipe(wr);
+  });
+};
+
+
 var promiseToListenForHttpRequests = function() {
   return new Promise(function(resolve, reject) {
     app = express();
@@ -275,22 +315,24 @@ var promiseToListenForHttpRequests = function() {
           var folderToSync = folderToSyncAndTildeScape[1];
           console.log(requestedTildeScape, foundTildeScape);
           if (foundTildeScape === requestedTildeScape) {
-            console.log("foo");
-
-            // nc -k -l 3456 | shasum -c -
-
-
+            
             var checkPath = config['publicDir'] + req.path;
-            console.log(checkPath);
 
             fs.readlink(checkPath, function(err, versionPath) {
               if (err) {
                 if ('ENOENT' === err.code) {
                   console.log('File not found!');
-                  fs.readFile(path.dirname(folderToSync) + req.path, function (err, data) {
+                  var existingFile = path.dirname(folderToSync) + req.path;
+
+                  fs.readFile(existingFile, function (err, data) {
                     if (err) { throw err; }
                     var checksumOfInboundFile = checksum(data, 'sha1');
-                    console.log(checksumOfInboundFile);
+                    console.log(checksumOfInboundFile, splitChars(checksumOfInboundFile, 8).join("/"));
+                    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'] + "FILES/" + checksumOfInboundFile).then(function() {
+                      console.log("copied");
+                    }).catch(function(err) {
+                      console.log(err);
+                    });
                   });
                 } else {
                   throw err;
