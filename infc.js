@@ -36,6 +36,8 @@ var spawn = require('child_process').spawn;
 var path = require('path');
 var fs = require('fs');
 var es = require('event-stream');
+
+var lookup = require('mime-types').lookup;
 var Promise = require('es6-promise').Promise;
 var express = require('express');
 
@@ -73,7 +75,8 @@ var promiseToSetResolvedFolderfilePath = function() {
 
 var promiseToCreateStaticFileCabinetDirectory = function() {
   return new Promise(function(resolve, reject) {
-    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/public/.sfc";
+    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/" + config['publicDir'] + ".sfc";
+
     fs.access(config['staticFileCabinetDirectory'], fs.R_OK | fs.W_OK, function (err) {
       if (err) {
         fs.mkdir(config['staticFileCabinetDirectory'], function(err) {
@@ -91,42 +94,24 @@ var checksum = function(str, algorithm, encoding) {
   return crypto.createHash(algorithm || 'md5').update(str, 'utf8').digest(encoding || 'hex');
 };
 
-var checkPathAndDo = function(path) {
-  var checkPath = "public/" + path;
-  console.log(checkPath);
-
-  fs.readlink(checkPath, function(err, versionPath) {
-    if (err) {
-      if ('ENOENT' === err.code) {
-        console.log('File not found!');
-        // touch public/      
-        fs.readFile("/Users/mavenlink/Downloads/" + path, function (err, data) {
-          if (err) { throw err; }
-          var checksumOfInboundFile = checksum(data, 'sha1');
-          console.log(checksumOfInboundFile);
-        });
-      } else {
-        throw err;
-      }
-    }
-  });
-};
-
 var createClientInterface = function() {
   var source = new EventSource("/stream");
   source.addEventListener("message", function(e){
     console.log(e.data);
     var linkToFilePara = document.createElement('p');
     var linkToFile = document.createElement('a');
+    var href = e.data;
+    linkToFile.href = href;
+    linkToFile.textContent = href;
     linkToFilePara.appendChild(linkToFile);
-    linkToFile.href = e.data;
-    linkToFile.textContent = e.data;
     document.body.appendChild(linkToFilePara);
   }, false);
 };
 
 var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
-  validDirsToWatch.forEach(function(validDir, index, array) {
+  validDirsToWatch.forEach(function(validDirAndTildeScape, index, array) {
+    var tildeScape = validDirAndTildeScape[0];
+    var validDir = validDirAndTildeScape[1];
     console.log('watching: ' + validDir);
     fs.watch(validDir, function (event, filename) {
       console.log('event is: ' + event);
@@ -158,17 +143,6 @@ var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
   });
 };
 
-// nc -k -l 3456 | shasum -c -
-
-var shaCheckingProcess = spawn("shasum", ["-c", "-"]);
-
-shaCheckingProcess.stdout.on('data', function (data) {
-  console.log('sha stdout: ' + data);
-});
-
-shaCheckingProcess.stderr.on('data', function (data) {
-  console.log('sha stderr: ' + data);
-});
 
 var stringPresent = function(str) {
   return !(null === str || 0 === str.length);
@@ -180,27 +154,31 @@ var promiseToListFolderfilesToSync = function() {
       if (err) { reject(err); }
       resolve(data.split("\n").filter(function(element, index, array) {
         return stringPresent(element);
+      }).map(function(element) {
+        //console.log(element.split("/"));
+        var tildeScape = element.split("/").pop();
+        return [tildeScape, element];
       }));
     });
   });
 };
 
 var loadIndexHtml = new Promise(function(resolve, reject) {
-  fs.readFile('public/index.html', function(err, data) {
+  fs.readFile(config['publicDir'] + 'index.html', function(err, data) {
     if (err) { reject(err); }
     resolve(data);
   });
 });
 
-//??? spawn('/usr/bin/open', ['http://' + config['-h'] + ':' + config['-p'] + '/']);
-//Promise.all(arrayOfPromises).then(function(arrayOfResults)
 
 var promiseToListAllFilesToSync = function() {
   var allFilesToSync = [];
   var allFileListingProcessPromises = [];
   return promiseToListFolderfilesToSync().then(function(foldersToSync) {
     console.log(foldersToSync);
-    foldersToSync.forEach(function(folderToSync) {
+    foldersToSync.forEach(function(folderToSyncAndTildeScape) {
+      var tildeScape = folderToSyncAndTildeScape[0];
+      var folderToSync = folderToSyncAndTildeScape[1];
       var folderToSyncPrefix = path.basename(folderToSync);
       var fileListingProcessPromise = new Promise(function(res, rej) {
         var fileListingProcess = spawn("find", ["-f", folderToSync]);
@@ -257,18 +235,13 @@ var promiseToListenForHttpRequests = function() {
     });
 
     app.get('/stream', function(req, res) {
-      sendFile = (function(eventStreamResponse) {
+      var sendFile = (function(eventStreamResponse) {
         return function(filename) {
           eventStreamResponse.write('id: ' + messageCount + '\n');
           eventStreamResponse.write("data: " + filename + '\n\n'); // Note the extra newline
           messageCount = messageCount + 1;
         };
       })(res);
-
-      //if (config['-c']) {
-      //  config['-c'].end();
-      //}
-      //config['-c'] = res;
 
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -292,28 +265,73 @@ var promiseToListenForHttpRequests = function() {
     app.use(function(req, res, next) {
       console.log("clerk tasks here: " + req.path);
       //var sentToCheck = shaCheckingProcess.stdin.write("/Users/mavenlink/Downloads/" + req.path + "\r\n");
+      //res.set('Content-Type', 'text/html');
+      //res.send(data);
+      var requestedTildeScape = req.path.split("/")[1];
+      promiseToListFolderfilesToSync().then(function(foldersToSyncAndTildeScapes) {
+        console.log(foldersToSyncAndTildeScapes);
+        foldersToSyncAndTildeScapes.forEach(function(folderToSyncAndTildeScape) {
+          var foundTildeScape = folderToSyncAndTildeScape[0];
+          var folderToSync = folderToSyncAndTildeScape[1];
+          console.log(requestedTildeScape, foundTildeScape);
+          if (foundTildeScape === requestedTildeScape) {
+            console.log("foo");
+
+            // nc -k -l 3456 | shasum -c -
+
+
+            var checkPath = config['publicDir'] + req.path;
+            console.log(checkPath);
+
+            fs.readlink(checkPath, function(err, versionPath) {
+              if (err) {
+                if ('ENOENT' === err.code) {
+                  console.log('File not found!');
+                  fs.readFile(path.dirname(folderToSync) + req.path, function (err, data) {
+                    if (err) { throw err; }
+                    var checksumOfInboundFile = checksum(data, 'sha1');
+                    console.log(checksumOfInboundFile);
+                  });
+                } else {
+                  throw err;
+                }
+              } else {
+                console.log("FILE EXISTS!!!");
+                /*
+                var shaCheckingProcess = spawn("shasum", ["-c", path.dirname(folderToSync) + req.path]);
+
+                shaCheckingProcess.stdout.on('data', function (data) {
+                  console.log('sha stdout: ' + data);
+                });
+
+                shaCheckingProcess.stderr.on('data', function (data) {
+                  console.log('sha stderr: ' + data);
+                });
+                */
+              }
+            });
+          }
+        });
+      }).catch(function(err) {
+        console.log(err);
+      });
     });
 
-    app.use(express.static(path.dirname(config['-f']) + '/public'));
+    app.use(express.static(path.dirname(config['-f']) + '/' + config['publicDir']));
 
     resolve(app.listen(config['-p']));
   });
 };
 
-var sequence = Promise.resolve();
-sequence.then(function() {
-  return promiseToSetResolvedFolderfilePath();
-}).then(function() {
-  return promiseToCreateStaticFileCabinetDirectory();
-}).then(function() {
-  return promiseToListenForHttpRequests();
-}).then(function() {
-  return promiseToListAllFilesToSync();
-}).then(function(allFiles) {
-  console.log("allfiles", allFiles);
-}).catch(function(err) {
+Promise.resolve()
+.then(promiseToSetResolvedFolderfilePath)
+.then(promiseToCreateStaticFileCabinetDirectory)
+.then(promiseToListenForHttpRequests)
+//.then(promiseToListAllFilesToSync)
+//.then(function(allFiles) {
+//  console.log("allfiles", allFiles);
+//  //??? spawn('/usr/bin/open', ['http://' + config['-h'] + ':' + config['-p'] + '/']);
+//})
+.catch(function(err) {
   console.log(err);
 });
-
-//promiseToReturnResolvedFolderfilePath().then(
-//).
