@@ -1,19 +1,13 @@
-// functional-file-cabinet
-
+/*
+// versioning-file-cabinet
 // INBOX
 // files named as their hashs
-// /usr/bin/shasum ~/Downloads/001.gif 
 // f83d1e71be12ea4fd9409fc917925aadc792a014  /Users/mavenlink/Downloads/001.gif
 // VERSIONS
 // ?v=
 
-// nc -k -l 3456 | shasum -c -
-// echo "0000000000000000000000000000000000000000  /Users/mavenlink/Downloads/001.gif" | nc localhost 3456
-// readlink
-//
-/*
   public/
-    .ffc
+    .vfc
       DELETED => /dev/null
       FILES/
         sha2/5/6/index
@@ -21,13 +15,9 @@
       VERSIONS/
         infc.gif/
           .deleted => ../../DELETED
-          abc123 => ../DROPBOX
+          000000 => ../FILES/sha2/5/6/index
 
-    infc.gif => .infc/VERSIONS/infc.gif/abc123
-
-
-locate public
-mkdir -p public/.sfc
+    infc.gif => .vfc/VERSIONS/infc.gif/000000
 
 */
 
@@ -36,14 +26,11 @@ var spawn = require('child_process').spawn;
 var path = require('path');
 var fs = require('fs');
 var es = require('event-stream');
-
 var lookup = require('mime-types').lookup;
 var Promise = require('es6-promise').Promise;
 var express = require('express');
-
 var poppingConfig = null;
 var config = {};
-var messageCount = 0;
 
 
 process.argv.forEach(function (val, index, array) {
@@ -79,7 +66,6 @@ var promiseToSetResolvedFolderfilePath = function() {
 var promiseToCreateStaticFileCabinetDirectory = function() {
   return new Promise(function(resolve, reject) {
     config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/" + config['publicDir'] + "/.sfc/";
-
     fs.access(config['staticFileCabinetDirectory'], fs.R_OK | fs.W_OK, function (err) {
       if (err) {
         fs.mkdir(config['staticFileCabinetDirectory'], function(err) {
@@ -114,17 +100,50 @@ var stringPresent = function(str) {
 
 
 var createClientInterface = function() {
-  var source = new EventSource("/stream");
-  source.addEventListener("message", function(e){
-    console.log(e.data);
-    var linkToFilePara = document.createElement('p');
-    var linkToFile = document.createElement('a');
-    var href = e.data;
-    linkToFile.href = href;
-    linkToFile.textContent = href;
-    linkToFilePara.appendChild(linkToFile);
-    document.body.appendChild(linkToFilePara);
-  }, false);
+  var inFrame = (window.self !== window.top);
+  if (!inFrame) {
+    var resourceFrame = null;
+    var preloadedSrc = "about:blank";
+    window.onpopstate = function(event) {
+      resourceFrame.src = event.state.frame;
+    };
+    var onResourceClicked = function(ev) {
+      ev.preventDefault();
+      resourceFrame.src = ev.target.href;
+      history.pushState({frame: resourceFrame.src}, window.title, "?" + ev.target.innerText);
+    };
+    window.addEventListener('load', function() {
+      resourceFrame = document.createElement("iframe");
+      document.body.appendChild(resourceFrame);
+      var preloadedSrc = window.location.href;
+      preloadedSrc = preloadedSrc.replace("?", "");
+      var reloadTimeout = null;
+      var preloaded = false;
+      resourceFrame.src = preloadedSrc;
+      resourceFrame.addEventListener('load', function() {
+        preloaded = true;
+      });
+      var source = new EventSource("/stream");
+      source.addEventListener("message", function(e){
+        var linkToFilePara = document.createElement('p');
+        var linkToFile = document.createElement('a');
+        linkToFile.addEventListener('click', onResourceClicked);
+        if (reloadTimeout) {
+          clearTimeout(reloadTimeout);
+        }
+        reloadTimeout = setTimeout(function() {
+          if (true === preloaded) {
+            resourceFrame.src += '';
+          }
+        }, 66);
+        var href = e.data;
+        linkToFile.href = href;
+        linkToFile.textContent = href;
+        linkToFilePara.appendChild(linkToFile);
+        document.body.appendChild(linkToFilePara);
+      }, false);
+    });
+  }
 };
 
 
@@ -137,12 +156,10 @@ var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
         var isChromeMeta = filename.startsWith('.com.google.Chrome');
         var isChromeDownload = filename.endsWith('.crdownload');
         var isSwp = filename.endsWith('.swp');
-
         if (isChromeMeta
             || isChromeDownload
             || isSwp) { return; }
       }
-
       promiseToListAllFilesToSync().then(function(allFiles) {
         allFiles.forEach(function(interestingFile) {
           var isInteresting = true;
@@ -221,21 +238,19 @@ var promiseToCopyFile = function(source, sfcPath, requested) {
       var splitDirPath = splitChars(checksumOfInboundFile, 8).join("/");
       var target = sfcPath + "FILES/" + splitDirPath;
       var versionsPath = sfcPath + "VERSIONS/" + requested;
-      console.log(checksumOfInboundFile, splitDirPath);
-      var mkdirAndCopyAndSymlink = "mkdir -p " + versionsPath + " && mkdir -p " + target + " && cp " + source + " " + target + " && mkdir -p " + path.dirname(requested) + " && export VERSION=$(ls -1 " + versionsPath + " | wc -l | awk '{ printf(\"%06d\", $1) }')" + " && ln -s " + target + "/" + path.basename(requested) + " " + versionsPath + "/$VERSION && ln -sf " + versionsPath + "/$VERSION " + requested + " && echo $VERSION";
+      var indexPath = "index" + path.extname(source);
+      var mkdirAndCopyAndSymlink = "mkdir -p " + versionsPath + " && mkdir -p " + target + " && cp " + source + " " + target + "/" + indexPath + " && mkdir -p " + path.dirname(requested) + " && export VERSION=$(ls -1 " + versionsPath + " | wc -l | awk '{ printf(\"%06d\", $1) }')" + " && ln -s " + target + "/" + indexPath + " " + versionsPath + "/$VERSION && ln -sf " + versionsPath + "/$VERSION " + requested + " && echo $VERSION";
       var fileListingProcess = spawn("sh", ["-c", mkdirAndCopyAndSymlink]);
       var version = null;
       fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
         var trimmedLine = data.trim();
         if (0 != trimmedLine.length) {
           version = trimmedLine;
-          console.log("VERSIOn", version);
         }
         cb(null);
       }));
       fileListingProcess.stdout.on('close', function(err) {
         if (err) { reject(err); }
-        console.log("RESOLVED", version);
         resolve(version);
       });
     });
@@ -246,15 +261,11 @@ var promiseToCopyFile = function(source, sfcPath, requested) {
 var promiseToListenForHttpRequests = function() {
   return new Promise(function(resolve, reject) {
     app = express();
-
     app.use(function(req, res, next) {
       var isRoot = '/' === req.path;
       var isInterfaceJavascript = '' === req.query.interfaceJavascript;
-      console.log(req.path, req.query.interface, isInterfaceJavascript, app.get('env'));
-
       var redirectToIndexHtml = isRoot && app.get('env') != 'development' && !isInterfaceJavascript;
       var respondWithInterfaceHtml = isRoot && app.get('env') === 'development' && !isInterfaceJavascript;
-
       if (redirectToIndexHtml) {
         res.redirect('/index.html');
       } else if (respondWithInterfaceHtml) {
@@ -273,8 +284,11 @@ var promiseToListenForHttpRequests = function() {
         next();
       }
     });
-
+    app.get('/favicon.ico', function(req, res) {
+      res.status(404).send('Not Found');
+    });
     app.get('/stream', function(req, res) {
+      var messageCount = 0;
       var sendFile = (function(eventStreamResponse) {
         return function(filename) {
           eventStreamResponse.write('id: ' + messageCount + '\n');
@@ -282,16 +296,13 @@ var promiseToListenForHttpRequests = function() {
           messageCount = messageCount + 1;
         };
       })(res);
-
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive'
       });
       res.write('\n');
-
       req.on("close", function() { });
-
       promiseToListAllFilesToSync().then(function(allFiles) {
         allFiles.forEach(function(interestingFile) {
           sendFile(interestingFile);
@@ -301,8 +312,6 @@ var promiseToListenForHttpRequests = function() {
         });
       });
     });
-
-
     app.use(function(req, res, next) {
       var requestedTildeScape = req.path.split("/")[1];
       promiseToListFolderfilesToSync().then(function(foldersToSyncAndTildeScapes) {
@@ -326,22 +335,17 @@ var promiseToListenForHttpRequests = function() {
                   res.send(err);
                 }
               } else {
-                ///Users/mavenlink/workspace/static-file-cabinet/public/.sfc/FILES/293ad002/c04a8f21/a5f95d99/b077c0a4/4bb6142e
                 var shaDir = versionPath.replace(config['staticFileCabinetDirectory'] + "FILES/", "");
                 var shaParts = shaDir.split("/");
                 shaParts.pop();
                 var shasum = shaParts.join("");
                 var shaCheckingProcess = spawn("shasum", ["-c", "-"]);
                 var shaSumInput = shasum + "  " + existingFile + "\n";
-                console.log(shaSumInput);
                 shaCheckingProcess.stdin.write(shaSumInput);
                 shaCheckingProcess.stdin.end();
-
                 shaCheckingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
-                  ///Users/mavenlink/Downloads/keep-synced/42aROjxVXbL._SY355_.jpg: OK
                   var trimmedLine = data.trim();
                   if (0 != trimmedLine.length) {
-                    console.log('sha stdout: ' + trimmedLine);
                     if (trimmedLine.endsWith(': OK')) {
                       var contentType = (lookup(checkPath) || 'application/octet-stream');
                       res.set('Content-Type', contentType);
@@ -360,13 +364,10 @@ var promiseToListenForHttpRequests = function() {
                   }
                   cb();
                 }));
-
                 shaCheckingProcess.stderr.pipe(es.split()).pipe(es.map(function (data, cb) {
                   var trimmedLine = data.trim();
                   if (0 != trimmedLine.length) {
                     console.log("shasum error: " + trimmedLine);
-                    //res.set('Content-Type', 'text/html');
-                    //res.send("shasum error: " + data);
                   }
                   cb();
                 }));
@@ -379,9 +380,7 @@ var promiseToListenForHttpRequests = function() {
         res.send(err);
       });
     });
-
     app.use(express.static(path.dirname(config['-f']) + '/' + config['publicDir']));
-
     resolve(app.listen(config['-p']));
   });
 };
