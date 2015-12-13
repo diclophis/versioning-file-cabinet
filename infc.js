@@ -181,8 +181,9 @@ var promiseToListFolderfilesToSync = function() {
     fs.readFile(config['-f'], 'utf8', function (err, data) {
       if (err) { reject(err); }
       resolve(data.split("\n").filter(function(element, index, array) {
-        return stringPresent(element);
+        return stringPresent(element)
       }).map(function(element) {
+        element = element.replace("~", process.env.HOME);
         var tildeScape = element.split("/").pop();
         return [tildeScape, element];
       }));
