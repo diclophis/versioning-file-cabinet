@@ -60,7 +60,7 @@ config['-p'] = config['-p'] || 3001;
 config['-f'] = config['-f'] || 'Folderfile';
 config['-h'] = config['-h'] || 'localhost';
 config['-c'] = null;
-config['publicDir'] = "public/";
+config['publicDir'] = "public";
 
 //console.log(config);
 
@@ -76,7 +76,7 @@ var promiseToSetResolvedFolderfilePath = function() {
 
 var promiseToCreateStaticFileCabinetDirectory = function() {
   return new Promise(function(resolve, reject) {
-    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/" + config['publicDir'] + ".sfc/";
+    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/" + config['publicDir'] + "/.sfc/";
 
     fs.access(config['staticFileCabinetDirectory'], fs.R_OK | fs.W_OK, function (err) {
       if (err) {
@@ -173,7 +173,7 @@ var promiseToListFolderfilesToSync = function() {
 };
 
 var loadIndexHtml = new Promise(function(resolve, reject) {
-  fs.readFile(config['publicDir'] + 'index.html', function(err, data) {
+  fs.readFile(config['publicDir'] + '/index.html', function(err, data) {
     if (err) { reject(err); }
     resolve(data);
   });
@@ -214,8 +214,25 @@ var promiseToListAllFilesToSync = function() {
 
 
 
-var promiseToCopyFile = function(source, target) {
+var promiseToCopyFile = function(source, target, requested) {
+console.log(source, target, requested);
   return new Promise(function(resolve, reject) {
+        var mkdirAndCopyAndSymlink = "mkdir -p " + target + " && cp " + source + " " + target + " && mkdir -p " + path.dirname(requested) + " && ln -s " + target + "/" + path.basename(source) + " " + requested;
+        var fileListingProcess = spawn("sh", ["-c", mkdirAndCopyAndSymlink]);
+        fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
+          //console.log('Got the following message:', data);
+          //if (stringPresent(data) && folderToSync != data) {
+          //  var canonFile = folderToSyncPrefix + data.replace(folderToSync, '');
+          //  allFilesToSync.push(canonFile);
+          //}
+          console.log("!!!", data);
+          cb(null);
+        }));
+        fileListingProcess.stdout.on('close', function(err) {
+          if (err) { reject(err); }
+          resolve();
+        });
+/*
     var cbCalled = false;
     var done = function(err) {
       if (!cbCalled) {
@@ -239,6 +256,7 @@ var promiseToCopyFile = function(source, target) {
       done();
     });
     rd.pipe(wr);
+*/
   });
 };
 
@@ -319,17 +337,20 @@ var promiseToListenForHttpRequests = function() {
             var checkPath = config['publicDir'] + req.path;
 
             fs.readlink(checkPath, function(err, versionPath) {
+              var existingFile = path.dirname(folderToSync) + req.path;
               if (err) {
                 if ('ENOENT' === err.code) {
                   console.log('File not found!');
-                  var existingFile = path.dirname(folderToSync) + req.path;
 
                   fs.readFile(existingFile, function (err, data) {
                     if (err) { throw err; }
                     var checksumOfInboundFile = checksum(data, 'sha1');
+                    var splitDir = splitChars(checksumOfInboundFile, 8).join("/");
                     console.log(checksumOfInboundFile, splitChars(checksumOfInboundFile, 8).join("/"));
-                    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'] + "FILES/" + checksumOfInboundFile).then(function() {
+                    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'] + "FILES/" + splitDir, checkPath).then(function() {
                       console.log("copied");
+                      res.set('Content-Type', 'text/html');
+                      res.send("Copied ... reload?");
                     }).catch(function(err) {
                       console.log(err);
                     });
@@ -338,18 +359,41 @@ var promiseToListenForHttpRequests = function() {
                   throw err;
                 }
               } else {
-                console.log("FILE EXISTS!!!");
-                /*
-                var shaCheckingProcess = spawn("shasum", ["-c", path.dirname(folderToSync) + req.path]);
+                ///Users/mavenlink/workspace/static-file-cabinet/public/.sfc/FILES/293ad002/c04a8f21/a5f95d99/b077c0a4/4bb6142e
+                var shaDir = versionPath.replace(config['staticFileCabinetDirectory'] + "FILES/", "");
+                var shaParts = shaDir.split("/");
+                shaParts.pop();
+                var shasum = shaParts.join("");
+                console.log("FILE EXISTS!!!", versionPath, shasum);
 
-                shaCheckingProcess.stdout.on('data', function (data) {
+                var shaCheckingProcess = spawn("shasum", ["-c", "-"]);
+
+                console.log(shasum + " " + existingFile + "\n");
+                shaCheckingProcess.stdin.write(shasum + "  " + existingFile + "\n");
+                //console.log(shaCheckingProcess.stdin);
+                shaCheckingProcess.stdin.end();
+
+                //path.dirname(folderToSync) + req.path]);
+
+                shaCheckingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
                   console.log('sha stdout: ' + data);
-                });
+                  ///Users/mavenlink/Downloads/keep-synced/41aROjxVXbL._SY355_.jpg: OK
+                  if (data.trim().endsWith(': OK')) {
+                    var contentType = (lookup(checkPath) || 'application/octet-stream');
+                    console.log(contentType);
+                    res.set('Content-Type', contentType);
+                    fs.readFile(checkPath, function (err, data) {
+                      if (err) { throw err; }
+                      res.send(data);
+                    });
+                  }
+                  cb();
+                }));
 
-                shaCheckingProcess.stderr.on('data', function (data) {
+                shaCheckingProcess.stderr.pipe(es.split()).pipe(es.map(function (data, cb) {
                   console.log('sha stderr: ' + data);
-                });
-                */
+                  cb();
+                }));
               }
             });
           }
