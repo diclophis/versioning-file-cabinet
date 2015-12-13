@@ -213,16 +213,31 @@ var promiseToListAllFilesToSync = function() {
 };
 
 
-var promiseToCopyFile = function(source, target, requested) {
+var promiseToCopyFile = function(source, sfcPath, requested) {
   return new Promise(function(resolve, reject) {
-    var mkdirAndCopyAndSymlink = "mkdir -p " + target + " && cp " + source + " " + target + " && mkdir -p " + path.dirname(requested) + " && ln -s " + target + "/" + path.basename(source) + " " + requested;
-    var fileListingProcess = spawn("sh", ["-c", mkdirAndCopyAndSymlink]);
-    //fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
-    //  cb(null);
-    //}));
-    fileListingProcess.stdout.on('close', function(err) {
+    fs.readFile(source, function (err, data) {
       if (err) { reject(err); }
-      resolve();
+      var checksumOfInboundFile = checksum(data, 'sha1');
+      var splitDirPath = splitChars(checksumOfInboundFile, 8).join("/");
+      var target = sfcPath + "FILES/" + splitDirPath;
+      var versionsPath = sfcPath + "VERSIONS/" + requested;
+      console.log(checksumOfInboundFile, splitDirPath);
+      var mkdirAndCopyAndSymlink = "mkdir -p " + versionsPath + " && mkdir -p " + target + " && cp " + source + " " + target + " && mkdir -p " + path.dirname(requested) + " && export VERSION=$(ls -1 " + versionsPath + " | wc -l | awk '{ printf(\"%06d\", $1) }')" + " && ln -s " + target + "/" + path.basename(requested) + " " + versionsPath + "/$VERSION && ln -sf " + versionsPath + "/$VERSION " + requested + " && echo $VERSION";
+      var fileListingProcess = spawn("sh", ["-c", mkdirAndCopyAndSymlink]);
+      var version = null;
+      fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
+        var trimmedLine = data.trim();
+        if (0 != trimmedLine.length) {
+          version = trimmedLine;
+          console.log("VERSIOn", version);
+        }
+        cb(null);
+      }));
+      fileListingProcess.stdout.on('close', function(err) {
+        if (err) { reject(err); }
+        console.log("RESOLVED", version);
+        resolve(version);
+      });
     });
   });
 };
@@ -296,23 +311,16 @@ var promiseToListenForHttpRequests = function() {
           var folderToSync = folderToSyncAndTildeScape[1];
           if (foundTildeScape === requestedTildeScape) {
             var checkPath = config['publicDir'] + req.path;
-            fs.readlink(checkPath, function(err, versionPath) {
+            fs.realpath(checkPath, function(err, versionPath) {
               var existingFile = path.dirname(folderToSync) + req.path;
               if (err) {
                 if ('ENOENT' === err.code) {
-                  fs.readFile(existingFile, function (err, data) {
-                    if (err) { throw err; }
-                    var checksumOfInboundFile = checksum(data, 'sha1');
-                    var splitDir = splitChars(checksumOfInboundFile, 8).join("/");
-                    console.log(checksumOfInboundFile, splitChars(checksumOfInboundFile, 8).join("/"));
-                    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'] + "FILES/" + splitDir, checkPath).then(function() {
-                      res.set('Content-Type', 'text/html');
-                      res.send("Copied ... reload?");
+                    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
+                      res.redirect(req.path + "?v=" + newFileVersion);
                     }).catch(function(err) {
                       res.set('Content-Type', 'text/html');
                       res.send(err);
                     });
-                  });
                 } else {
                   res.set('Content-Type', 'text/html');
                   res.send(err);
@@ -324,7 +332,9 @@ var promiseToListenForHttpRequests = function() {
                 shaParts.pop();
                 var shasum = shaParts.join("");
                 var shaCheckingProcess = spawn("shasum", ["-c", "-"]);
-                shaCheckingProcess.stdin.write(shasum + "  " + existingFile + "\n");
+                var shaSumInput = shasum + "  " + existingFile + "\n";
+                console.log(shaSumInput);
+                shaCheckingProcess.stdin.write(shaSumInput);
                 shaCheckingProcess.stdin.end();
 
                 shaCheckingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
@@ -340,8 +350,9 @@ var promiseToListenForHttpRequests = function() {
                         res.send(data);
                       });
                     } else if (trimmedLine.endsWith(': FAILED')) {
-                      res.set('Content-Type', 'text/html');
-                      res.send("NEW FILE!!!: " + trimmedLine);
+                      promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
+                        res.redirect(req.path + "?v=" + newFileVersion);
+                      });
                     } else {
                       res.set('Content-Type', 'text/html');
                       res.send("UNKNOWN: " + trimmedLine);
