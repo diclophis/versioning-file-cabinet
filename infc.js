@@ -123,6 +123,8 @@ var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
     var validDir = validDirAndTildeScape[1];
     console.log('watching: ' + validDir);
     fs.watch(validDir, function (event, filename) {
+
+
       console.log('event is: ' + event);
       if (filename) {
         var isChromeMeta = filename.startsWith('.com.google.Chrome');
@@ -133,6 +135,11 @@ var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
 
         console.log('filename provided: ' + filename);
 
+        promiseToListAllFilesToSync().then(function(allFiles) {
+          allFiles.forEach(function(interestingFile) {
+            sendFile(interestingFile);
+          });
+        });
         /*
         if (config['-c']) {
           //config['-c'].write('id: ' + messageCount + '\n');
@@ -142,9 +149,9 @@ var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
           checkPathAndDo(filename); 
         }
         */
-        if ("function" === typeof(sendFile)) {
-          sendFile(filename);
-        }
+        //if ("function" === typeof(sendFile)) {
+        //  sendFile(filename);
+        //}
       } else {
         console.log('filename not provided');
       }
