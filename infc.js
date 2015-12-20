@@ -29,8 +29,39 @@ var es = require('event-stream');
 var lookup = require('mime-types').lookup;
 var Promise = require('es6-promise').Promise;
 var express = require('express');
+var MemoryFS = require("memory-fs");
+var webpack = require("webpack");
+
+
+var webpackConfig = {
+  node: {
+    console: true,
+  },
+  bail: true,
+  entry: ["./client.js"],
+  output: {
+    path: '/',
+    filename: "[name].js"
+  }
+}
 var poppingConfig = null;
 var config = {};
+var mfs = new MemoryFS();
+var compiler = webpack(webpackConfig);
+compiler.outputFileSystem = mfs;
+
+
+var promiseToCompileMainJs = function() {
+  return new Promise(function(resolve, reject) {
+    compiler.run(function(err, stats) {
+      if (err) { return reject(err); }
+      mfs.readFile("/main.js", function(err, data) {
+        if (err) { return reject(err); }
+        resolve(data);
+      });
+    });
+  });
+};
 
 
 process.argv.forEach(function (val, index, array) {
@@ -96,54 +127,6 @@ var checksum = function(str, algorithm, encoding) {
 
 var stringPresent = function(str) {
   return !(null === str || 0 === str.length);
-};
-
-
-var createClientInterface = function() {
-  var inFrame = (window.self !== window.top);
-  if (!inFrame) {
-    var resourceFrame = null;
-    var preloadedSrc = "about:blank";
-    window.onpopstate = function(event) {
-      resourceFrame.src = event.state.frame;
-    };
-    var onResourceClicked = function(ev) {
-      ev.preventDefault();
-      resourceFrame.src = ev.target.href;
-      history.pushState({frame: resourceFrame.src}, window.title, "?" + ev.target.innerText);
-    };
-    window.addEventListener('load', function() {
-      resourceFrame = document.createElement("iframe");
-      document.body.appendChild(resourceFrame);
-      var preloadedSrc = window.location.href;
-      preloadedSrc = preloadedSrc.replace("?", "");
-      var reloadTimeout = null;
-      var preloaded = false;
-      resourceFrame.src = preloadedSrc;
-      resourceFrame.addEventListener('load', function() {
-        preloaded = true;
-      });
-      var source = new EventSource("/stream");
-      source.addEventListener("message", function(e){
-        var linkToFilePara = document.createElement('p');
-        var linkToFile = document.createElement('a');
-        linkToFile.addEventListener('click', onResourceClicked);
-        if (reloadTimeout) {
-          clearTimeout(reloadTimeout);
-        }
-        reloadTimeout = setTimeout(function() {
-          if (true === preloaded) {
-            resourceFrame.src += '';
-          }
-        }, 66);
-        var href = e.data;
-        linkToFile.href = href;
-        linkToFile.textContent = href;
-        linkToFilePara.appendChild(linkToFile);
-        document.body.appendChild(linkToFilePara);
-      }, false);
-    });
-  }
 };
 
 
@@ -275,9 +258,16 @@ var promiseToListenForHttpRequests = function() {
           res.send(data);
         });
       } else if (isInterfaceJavascript) {
+        //TODO: ...
         if ('development' === app.get('env')) {
-          res.set('Content-Type', 'text/javascript');
-          res.send('(' + createClientInterface.toString() + ')();');
+          promiseToCompileMainJs().then(function(indexJs) {
+            res.set('Content-Type', 'text/javascript');
+            res.send(indexJs);
+          }).catch(function(err) {
+            res.set('Content-Type', 'text/plain');
+            res.status(500);
+            res.send(err);
+          });
         } else {
           res.end();
         }
