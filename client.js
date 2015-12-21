@@ -1,6 +1,7 @@
 var React = require('react');
 var ReactDOM = require('react-dom');
 
+
 var createClientInterface = function() {
   var inFrame = (window.self !== window.top);
   if (!inFrame) {
@@ -50,6 +51,7 @@ var createClientInterface = function() {
 
 createClientInterface();
 
+
 var Client = React.createClass({
   render: function() {
     return React.createElement("div", null, "Hello");
@@ -58,3 +60,4 @@ var Client = React.createClass({
 
 
 ReactDOM.render(React.createElement(Client), document.getElementById("index"));
+require("./style.css");

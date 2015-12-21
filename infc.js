@@ -37,11 +37,15 @@ var webpackConfig = {
   node: {
     console: true,
   },
-  bail: true,
   entry: ["./client.js"],
   output: {
     path: '/',
     filename: "[name].js"
+  },
+  module: {
+    loaders: [
+      { test: /\.css$/, loader: "style!css" }
+    ]
   }
 }
 var poppingConfig = null;
