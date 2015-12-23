@@ -402,8 +402,9 @@ var promiseToListenForHttpRequests = function() {
       var messageCount = 0;
       var sendFile = (function(eventStreamResponse) {
         return function(filename, versions) {
-          var stateOfFile = {}
-          stateOfFile[filename] = {
+          var stateOfFile = {
+          //stateOfFile[filename] = {
+            path: filename,
             versions: versions
           };
           eventStreamResponse.write('id: ' + messageCount + '\n');
