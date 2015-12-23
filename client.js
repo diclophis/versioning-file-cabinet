@@ -80,7 +80,7 @@ var Client = React.createClass({
       versionInputs.push(link);
       var selectedIndex = this.state.selectedVersions[filename] || this.state.files[filename].versions[(this.state.files[filename].versions.length - 1)];
       this.state.files[filename].versions.forEach(function(version) {
-        var versionInput = React.createElement("input", {onChange: this.onVersionChanged, "data-filename": filename, key: version, type: "radio", value: version, checked: selectedIndex === version}, null);
+        var versionInput = React.createElement("input", {onMouseOver: this.onVersionChanged, onChange: this.onVersionChanged, "data-filename": filename, key: version, type: "radio", value: version, checked: selectedIndex === version}, null);
         versionInputs.push(versionInput);
       }.bind(this));
       var resourceLink = React.createElement("p", {key: filename},

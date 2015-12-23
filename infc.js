@@ -161,29 +161,39 @@ var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
   validDirsToWatch.forEach(function(validDirAndTildeScape, index, array) {
     var tildeScape = validDirAndTildeScape[0];
     var validDir = validDirAndTildeScape[1];
+    var isSync = false;
     fs.watch(validDir, function (event, filename) {
       if (!isOkFilename(filename)) {
         return;
       }
-      promiseToListAllFilesToSync().then(function(allFiles) {
-        allFiles.forEach(function(interestingFile) {
-          var isInteresting = true;
-          if (filename && !interestingFile.endsWith(filename)) {
-            isInteresting = false;
-          }
-          if (isInteresting) {
-            promiseToHandlePath("/" + interestingFile).then(function(handledPathResult) {
-              promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
-                sendFile(interestingFile, allVersions);
+      if (false === isSync) {
+        isSync = true;
+        promiseToListAllFilesToSync().then(function(allFiles) {
+          allFiles.forEach(function(interestingFile) {
+            var isInteresting = true;
+            if (filename && !interestingFile.endsWith(filename)) {
+              isInteresting = false;
+            }
+            if (isInteresting) {
+              promiseToHandlePath("/" + interestingFile).then(function(handledPathResult) {
+                promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
+                  sendFile(interestingFile, allVersions);
+                }).catch(function(err) {
+                  console.log("error listing versions", err);
+                });
               }).catch(function(err) {
-                console.log("error listing versions", err);
+                console.log("error handling file", err, interestingFile);
               });
-            }).catch(function(err) {
-              console.log("error handling file", err, interestingFile);
-            });
-          }
+            }
+          });
+          isSync = false;
+        }).catch(function(err) {
+          console.log("cant list all files", err);
+          isSync = false;
         });
-      });
+      } else {
+        console.log("DOUBLE");
+      }
     });
   });
 };
