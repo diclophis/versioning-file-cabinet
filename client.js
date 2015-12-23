@@ -45,7 +45,7 @@ var Client = React.createClass({
   },
   onResourceClicked: function(ev) {
     ev.preventDefault();
-    this.setState({resourceFrameSrc: ev.target.href});
+    this.setState({resourceFrameSrc: ev.target.dataset.filename});
     //resourceFrame.src = ev.target.href;
     //history.pushState({frame: resourceFrame.src}, window.title, "?" + ev.target.innerText);
     //linkToFile.addEventListener('click', onResourceClicked);
@@ -74,7 +74,7 @@ var Client = React.createClass({
     var filenames = Object.keys(this.state.files);
     filenames.forEach(function(filename) {
       var versionInputs = [];
-      var link = React.createElement("a", {key: filename, href: filename, onClick: this.onResourceClicked}, filename);
+      var link = React.createElement("a", {key: filename, "data-filename": filename, href: filename, onClick: this.onResourceClicked}, filename);
       versionInputs.push(link);
       var selectedIndex = this.state.selectedVersions[filename] || this.state.files[filename].versions[(this.state.files[filename].versions.length - 1)];
       //versionInputs[1 + selectedIndex].props.checked = true;
@@ -89,8 +89,10 @@ var Client = React.createClass({
       );
       resourceLinks.push(resourceLink);
     }.bind(this));
-    var resourceFrame = React.createElement("iframe", {src: this.state.resourceFrameSrc});
-    resourceLinks.push(resourceFrame);
+    if (this.state.resourceFrameSrc) {
+      var resourceFrame = React.createElement("iframe", {src: this.state.resourceFrameSrc + "?v=" + (this.state.selectedVersions[this.state.resourceFrameSrc] || this.state.files[this.state.resourceFrameSrc].versions[(this.state.files[this.state.resourceFrameSrc].versions.length - 1)])});
+      resourceLinks.push(resourceFrame);
+    }
     return React.createElement("div", null, resourceLinks);
   }
 });

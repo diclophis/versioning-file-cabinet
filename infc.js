@@ -272,7 +272,8 @@ var promiseToCopyFile = function(source, sfcPath, requested) {
   });
 };
 
-var promiseToHandlePath = function(pathToHandle) {
+
+var promiseToHandlePath = function(pathToHandle, desiredVersion) {
   return new Promise(function(resolve, reject) {
     if (!isOkFilename(pathToHandle)) {
       return reject("invalid filename!!!!", pathToHandle);
@@ -311,6 +312,9 @@ var promiseToHandlePath = function(pathToHandle) {
                 if (0 != trimmedLine.length) {
                   if (trimmedLine.endsWith(': OK')) {
                     var contentType = (lookup(checkPath) || 'application/octet-stream');
+                    if (desiredVersion) {
+                      checkPath = config['staticFileCabinetDirectory'] + "/VERSIONS/public/" + pathToHandle + "/" + desiredVersion;
+                    }
                     fs.readFile(checkPath, function (err, data) {
                       if (err) { return reject(err); }
                       return resolve({resolution: "up-to-date", data: data, contentType: contentType});
@@ -342,7 +346,7 @@ var promiseToHandlePath = function(pathToHandle) {
 
 
 var handlePath = function(req, res, next) {
-  promiseToHandlePath(req.path).then(function(handledPathResult) {
+  promiseToHandlePath(req.path, req.query.v).then(function(handledPathResult) {
     if ("updated" === handledPathResult.resolution) {
       //res.redirect(pathToHandle + "?v=" + newFileVersion);
       res.set('Content-Type', 'text/html');
