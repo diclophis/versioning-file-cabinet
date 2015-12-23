@@ -86,6 +86,26 @@ config['-h'] = config['-h'] || 'localhost';
 config['-c'] = null;
 config['publicDir'] = "public";
 
+var isOkFilename = function(filename) {
+  var isChromeMeta = filename.startsWith('.com.google.Chrome');
+  var isChromeDownload = filename.endsWith('.crdownload');
+  var isSwp = filename.endsWith('.swp');
+  return !(isChromeMeta
+           || isChromeDownload
+           || isSwp);
+};
+
+
+var promiseToGetListOfVersions = function(path) {
+  return new Promise(function(resolve, reject) {
+    console.log('getVersions', path);
+    fs.readdir(config['staticFileCabinetDirectory'] + "VERSIONS/public/" + path, function(err, files) {
+      if (err) { return reject(err); }
+      resolve(files);
+    });
+  });
+};
+
 
 var promiseToSetResolvedFolderfilePath = function() {
   return new Promise(function(resolve, reject) {
@@ -139,13 +159,8 @@ var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
     var tildeScape = validDirAndTildeScape[0];
     var validDir = validDirAndTildeScape[1];
     fs.watch(validDir, function (event, filename) {
-      if (filename) {
-        var isChromeMeta = filename.startsWith('.com.google.Chrome');
-        var isChromeDownload = filename.endsWith('.crdownload');
-        var isSwp = filename.endsWith('.swp');
-        if (isChromeMeta
-            || isChromeDownload
-            || isSwp) { return; }
+      if (!isOkFilename(filename)) {
+        return;
       }
       promiseToListAllFilesToSync().then(function(allFiles) {
         allFiles.forEach(function(interestingFile) {
@@ -154,7 +169,15 @@ var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
             isInteresting = false;
           }
           if (isInteresting) {
-            sendFile(interestingFile);
+            promiseToHandlePath("/" + interestingFile).then(function(handledPathResult) {
+              promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
+                sendFile(interestingFile, allVersions);
+              }).catch(function(err) {
+                console.log("error listing versions", err);
+              });
+            }).catch(function(err) {
+              console.log("error handling file", err, interestingFile);
+            });
           }
         });
       });
@@ -166,7 +189,7 @@ var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
 var promiseToListFolderfilesToSync = function() {
   return new Promise(function(resolve, reject) {
     fs.readFile(config['-f'], 'utf8', function (err, data) {
-      if (err) { reject(err); }
+      if (err) { return reject(err); }
       resolve(data.split("\n").filter(function(element, index, array) {
         return stringPresent(element)
       }).map(function(element) {
@@ -181,7 +204,7 @@ var promiseToListFolderfilesToSync = function() {
 
 var loadIndexHtml = new Promise(function(resolve, reject) {
   fs.readFile(config['publicDir'] + '/index.html', function(err, data) {
-    if (err) { reject(err); }
+    if (err) { return reject(err); }
     resolve(data);
   });
 });
@@ -221,7 +244,7 @@ var promiseToListAllFilesToSync = function() {
 var promiseToCopyFile = function(source, sfcPath, requested) {
   return new Promise(function(resolve, reject) {
     fs.readFile(source, function (err, data) {
-      if (err) { reject(err); }
+      if (err) { return reject(err); }
       var checksumOfInboundFile = checksum(data, 'sha1');
       var splitDirPath = splitChars(checksumOfInboundFile, 8).join("/");
       var target = sfcPath + "FILES/" + splitDirPath;
@@ -242,6 +265,99 @@ var promiseToCopyFile = function(source, sfcPath, requested) {
         resolve(version);
       });
     });
+  });
+};
+
+var promiseToHandlePath = function(pathToHandle) {
+  return new Promise(function(resolve, reject) {
+    if (!isOkFilename(pathToHandle)) {
+      return reject("invalid filename!!!!", pathToHandle);
+    }
+
+    var requestedTildeScape = pathToHandle.split("/")[1];
+    promiseToListFolderfilesToSync().then(function(foldersToSyncAndTildeScapes) {
+      foldersToSyncAndTildeScapes.forEach(function(folderToSyncAndTildeScape) {
+        var foundTildeScape = folderToSyncAndTildeScape[0];
+        var folderToSync = folderToSyncAndTildeScape[1];
+        if (foundTildeScape === requestedTildeScape) {
+          var checkPath = config['publicDir'] + pathToHandle;
+          fs.realpath(checkPath, function(err, versionPath) {
+            var existingFile = path.dirname(folderToSync) + pathToHandle;
+            if (err) {
+              if ('ENOENT' === err.code) {
+                  promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
+                    return resolve({resolution: "updated", version: newFileVersion});
+                  }).catch(function(err) {
+                    return reject(err);
+                  });
+              } else {
+                return reject(err);
+              }
+            } else {
+              var shaDir = versionPath.replace(config['staticFileCabinetDirectory'] + "FILES/", "");
+              var shaParts = shaDir.split("/");
+              shaParts.pop();
+              var shasum = shaParts.join("");
+              var shaCheckingProcess = spawn("shasum", ["-c", "-"]);
+              var shaSumInput = shasum + "  " + existingFile + "\n";
+              shaCheckingProcess.stdin.write(shaSumInput);
+              shaCheckingProcess.stdin.end();
+              shaCheckingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
+                var trimmedLine = data.trim();
+                if (0 != trimmedLine.length) {
+                  if (trimmedLine.endsWith(': OK')) {
+                    var contentType = (lookup(checkPath) || 'application/octet-stream');
+                    console.log("!!@#", contentType);
+                    fs.readFile(checkPath, function (err, data) {
+                      if (err) { return reject(err); }
+                      //console.log("22222222222222", contentType);
+                      return resolve({resolution: "up-to-date", data: data, contentType: contentType});
+                    });
+                  } else if (trimmedLine.endsWith(': FAILED')) {
+                    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
+                      return resolve({resolution: "updated", version: newFileVersion});
+                    });
+                  } else {
+                    console.log("WTF", trimmedLine);
+                    reject(trimmedLine);
+                  }
+                }
+                cb();
+              }));
+              shaCheckingProcess.stderr.pipe(es.split()).pipe(es.map(function (data, cb) {
+                var trimmedLine = data.trim();
+                if (0 != trimmedLine.length) {
+                  console.log("shasum error: " + trimmedLine);
+                }
+                cb();
+              }));
+            }
+          });
+        }
+      });
+    })
+  })
+};
+
+var handlePath = function(req, res, next) {
+  console.log("handling", req.path);
+  promiseToHandlePath(req.path).then(function(handledPathResult) {
+    console.log("!@#!@#", handledPathResult);
+    if ("updated" === handledPathResult.resolution) {
+      //res.redirect(req.path + "?v=" + newFileVersion);
+      //res.redirect(pathToHandle + "?v=" + newFileVersion);
+      res.set('Content-Type', 'text/html');
+      res.send(req.path + "?v=" + handledPathResult.version);
+    } else if ("up-to-date" === handledPathResult.resolution) {
+      res.set('Content-Type', handledPathResult.contentType);
+      res.send(handledPathResult.data);
+    } else {
+      res.set('Content-Type', 'text/html');
+      res.send("unknown resolution: " + handledPathResult.resolution);
+    }
+  }).catch(function(err) {
+    res.set('Content-Type', 'text/html');
+    res.send(err);
   });
 };
 
@@ -285,9 +401,13 @@ var promiseToListenForHttpRequests = function() {
     app.get('/stream', function(req, res) {
       var messageCount = 0;
       var sendFile = (function(eventStreamResponse) {
-        return function(filename) {
+        return function(filename, versions) {
+          var stateOfFile = {}
+          stateOfFile[filename] = {
+            versions: versions
+          };
           eventStreamResponse.write('id: ' + messageCount + '\n');
-          eventStreamResponse.write("data: " + filename + '\n\n'); // Note the extra newline
+          eventStreamResponse.write("data: " + JSON.stringify(stateOfFile) + '\n\n'); // Note the extra newline
           messageCount = messageCount + 1;
         };
       })(res);
@@ -300,81 +420,22 @@ var promiseToListenForHttpRequests = function() {
       req.on("close", function() { });
       promiseToListAllFilesToSync().then(function(allFiles) {
         allFiles.forEach(function(interestingFile) {
-          sendFile(interestingFile);
+          console.log(allFiles);
+          if (isOkFilename(interestingFile)) {
+            promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
+              sendFile(interestingFile, allVersions);
+            }).catch(function(err) {
+              console.log("error listing versions", err);
+            });
+          }
         });
         return promiseToListFolderfilesToSync().then(function(foldersToSync) {
+          console.log(foldersToSync);
           return promiseToWatchFilesFromFolders(foldersToSync, sendFile);
         });
       });
     });
-    app.use(function(req, res, next) {
-      var requestedTildeScape = req.path.split("/")[1];
-      promiseToListFolderfilesToSync().then(function(foldersToSyncAndTildeScapes) {
-        foldersToSyncAndTildeScapes.forEach(function(folderToSyncAndTildeScape) {
-          var foundTildeScape = folderToSyncAndTildeScape[0];
-          var folderToSync = folderToSyncAndTildeScape[1];
-          if (foundTildeScape === requestedTildeScape) {
-            var checkPath = config['publicDir'] + req.path;
-            fs.realpath(checkPath, function(err, versionPath) {
-              var existingFile = path.dirname(folderToSync) + req.path;
-              if (err) {
-                if ('ENOENT' === err.code) {
-                    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
-                      res.redirect(req.path + "?v=" + newFileVersion);
-                    }).catch(function(err) {
-                      res.set('Content-Type', 'text/html');
-                      res.send(err);
-                    });
-                } else {
-                  res.set('Content-Type', 'text/html');
-                  res.send(err);
-                }
-              } else {
-                var shaDir = versionPath.replace(config['staticFileCabinetDirectory'] + "FILES/", "");
-                var shaParts = shaDir.split("/");
-                shaParts.pop();
-                var shasum = shaParts.join("");
-                var shaCheckingProcess = spawn("shasum", ["-c", "-"]);
-                var shaSumInput = shasum + "  " + existingFile + "\n";
-                shaCheckingProcess.stdin.write(shaSumInput);
-                shaCheckingProcess.stdin.end();
-                shaCheckingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
-                  var trimmedLine = data.trim();
-                  if (0 != trimmedLine.length) {
-                    if (trimmedLine.endsWith(': OK')) {
-                      var contentType = (lookup(checkPath) || 'application/octet-stream');
-                      res.set('Content-Type', contentType);
-                      fs.readFile(checkPath, function (err, data) {
-                        if (err) { throw err; }
-                        res.send(data);
-                      });
-                    } else if (trimmedLine.endsWith(': FAILED')) {
-                      promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
-                        res.redirect(req.path + "?v=" + newFileVersion);
-                      });
-                    } else {
-                      res.set('Content-Type', 'text/html');
-                      res.send("UNKNOWN: " + trimmedLine);
-                    }
-                  }
-                  cb();
-                }));
-                shaCheckingProcess.stderr.pipe(es.split()).pipe(es.map(function (data, cb) {
-                  var trimmedLine = data.trim();
-                  if (0 != trimmedLine.length) {
-                    console.log("shasum error: " + trimmedLine);
-                  }
-                  cb();
-                }));
-              }
-            });
-          }
-        });
-      }).catch(function(err) {
-        res.set('Content-Type', 'text/html');
-        res.send(err);
-      });
-    });
+    app.use(handlePath);
     app.use(express.static(path.dirname(config['-f']) + '/' + config['publicDir']));
     resolve(app.listen(config['-p']));
   });

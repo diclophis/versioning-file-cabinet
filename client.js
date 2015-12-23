@@ -2,7 +2,7 @@ var React = require('react');
 var ReactDOM = require('react-dom');
 
 
-var createClientInterface = function() {
+var bindFilesystemEventInterface = function(reactComp) {
   var inFrame = (window.self !== window.top);
   if (!inFrame) {
     var resourceFrame = null;
@@ -28,6 +28,7 @@ var createClientInterface = function() {
       });
       var source = new EventSource("/stream");
       source.addEventListener("message", function(e){
+        /*
         var linkToFilePara = document.createElement('p');
         var linkToFile = document.createElement('a');
         linkToFile.addEventListener('click', onResourceClicked);
@@ -39,22 +40,29 @@ var createClientInterface = function() {
             resourceFrame.src += '';
           }
         }, 66);
-        var href = e.data;
-        linkToFile.href = href;
-        linkToFile.textContent = href;
-        linkToFilePara.appendChild(linkToFile);
-        document.body.appendChild(linkToFilePara);
+        */
+
+        var fileState = JSON.parse(e.data);
+        reactComp.setState(fileState);
+
+        //var href = e.data;
+        //linkToFile.href = href;
+        //linkToFile.textContent = href;
+        //linkToFilePara.appendChild(linkToFile);
+        //document.body.appendChild(linkToFilePara);
       }, false);
     });
   }
 };
 
-createClientInterface();
 
 
 var Client = React.createClass({
+  componentWillMount: function() {
+    bindFilesystemEventInterface(this);
+  },
   render: function() {
-    return React.createElement("div", null, "Hello");
+    return React.createElement("div", null, "Hello" + JSON.stringify(this.state));
   }
 });
 
