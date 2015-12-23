@@ -33,6 +33,7 @@ var MemoryFS = require("memory-fs");
 var webpack = require("webpack");
 
 
+//TODO: move all config into module
 var webpackConfig = {
   node: {
     console: true,
@@ -55,19 +56,7 @@ var compiler = webpack(webpackConfig);
 compiler.outputFileSystem = mfs;
 
 
-var promiseToCompileMainJs = function() {
-  return new Promise(function(resolve, reject) {
-    compiler.run(function(err, stats) {
-      if (err) { return reject(err); }
-      mfs.readFile("/main.js", function(err, data) {
-        if (err) { return reject(err); }
-        resolve(data);
-      });
-    });
-  });
-};
-
-
+//TODO: also include argv processing in config module!
 process.argv.forEach(function (val, index, array) {
   if (null === poppingConfig) {
     poppingConfig = 'infc.js';
@@ -86,6 +75,8 @@ config['-h'] = config['-h'] || 'localhost';
 config['-c'] = null;
 config['publicDir'] = "public";
 
+
+//TODO: flesh out list of bad filenames
 var isOkFilename = function(filename) {
   var isChromeMeta = filename.startsWith('.com.google.Chrome');
   var isChromeDownload = filename.endsWith('.crdownload');
@@ -96,9 +87,21 @@ var isOkFilename = function(filename) {
 };
 
 
+var promiseToCompileMainJs = function() {
+  return new Promise(function(resolve, reject) {
+    compiler.run(function(err, stats) {
+      if (err) { return reject(err); }
+      mfs.readFile("/main.js", function(err, data) {
+        if (err) { return reject(err); }
+        resolve(data);
+      });
+    });
+  });
+};
+
+
 var promiseToGetListOfVersions = function(path) {
   return new Promise(function(resolve, reject) {
-    console.log('getVersions', path);
     fs.readdir(config['staticFileCabinetDirectory'] + "VERSIONS/public/" + path, function(err, files) {
       if (err) { return reject(err); }
       resolve(files);
@@ -110,9 +113,9 @@ var promiseToGetListOfVersions = function(path) {
 var promiseToSetResolvedFolderfilePath = function() {
   return new Promise(function(resolve, reject) {
     fs.realpath(config['-f'], function(err, fullFolderfilePath) {
-      if (err) { reject(err); }
+      if (err) { return reject(err); }
       config['resolvedFolerfileDirname'] = path.dirname(fullFolderfilePath);
-      resolve(fullFolderfilePath);
+      return resolve(fullFolderfilePath);
     });
   });
 };
@@ -124,11 +127,11 @@ var promiseToCreateStaticFileCabinetDirectory = function() {
     fs.access(config['staticFileCabinetDirectory'], fs.R_OK | fs.W_OK, function (err) {
       if (err) {
         fs.mkdir(config['staticFileCabinetDirectory'], function(err) {
-          if (err) { reject(err); }
-          resolve(config['staticFileCabinetDirectory']);
+          if (err) { return reject(err); }
+          return resolve(config['staticFileCabinetDirectory']);
         });
       } else {
-        resolve(config['staticFileCabinetDirectory']);
+        return resolve(config['staticFileCabinetDirectory']);
       }
     });
   });
@@ -190,7 +193,7 @@ var promiseToListFolderfilesToSync = function() {
   return new Promise(function(resolve, reject) {
     fs.readFile(config['-f'], 'utf8', function (err, data) {
       if (err) { return reject(err); }
-      resolve(data.split("\n").filter(function(element, index, array) {
+      return resolve(data.split("\n").filter(function(element, index, array) {
         return stringPresent(element)
       }).map(function(element) {
         element = element.replace("~", process.env.HOME);
@@ -205,7 +208,7 @@ var promiseToListFolderfilesToSync = function() {
 var loadIndexHtml = new Promise(function(resolve, reject) {
   fs.readFile(config['publicDir'] + '/index.html', function(err, data) {
     if (err) { return reject(err); }
-    resolve(data);
+    return resolve(data);
   });
 });
 
@@ -218,6 +221,7 @@ var promiseToListAllFilesToSync = function() {
       var tildeScape = folderToSyncAndTildeScape[0];
       var folderToSync = folderToSyncAndTildeScape[1];
       var folderToSyncPrefix = path.basename(folderToSync);
+      //TODO: !!!!!
       var fileListingProcessPromise = new Promise(function(res, rej) {
         var fileListingProcess = spawn("find", ["-f", folderToSync]);
         fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
@@ -228,8 +232,8 @@ var promiseToListAllFilesToSync = function() {
           cb(null);
         }));
         fileListingProcess.stdout.on('close', function(err) {
-          if (err) { rej(err); }
-          res();
+          if (err) { return rej(err); }
+          return res();
         });
       });
       allFileListingProcessPromises.push(fileListingProcessPromise);
@@ -307,10 +311,8 @@ var promiseToHandlePath = function(pathToHandle) {
                 if (0 != trimmedLine.length) {
                   if (trimmedLine.endsWith(': OK')) {
                     var contentType = (lookup(checkPath) || 'application/octet-stream');
-                    console.log("!!@#", contentType);
                     fs.readFile(checkPath, function (err, data) {
                       if (err) { return reject(err); }
-                      //console.log("22222222222222", contentType);
                       return resolve({resolution: "up-to-date", data: data, contentType: contentType});
                     });
                   } else if (trimmedLine.endsWith(': FAILED')) {
@@ -318,8 +320,7 @@ var promiseToHandlePath = function(pathToHandle) {
                       return resolve({resolution: "updated", version: newFileVersion});
                     });
                   } else {
-                    console.log("WTF", trimmedLine);
-                    reject(trimmedLine);
+                    return reject(trimmedLine);
                   }
                 }
                 cb();
@@ -339,25 +340,24 @@ var promiseToHandlePath = function(pathToHandle) {
   })
 };
 
+
 var handlePath = function(req, res, next) {
-  console.log("handling", req.path);
   promiseToHandlePath(req.path).then(function(handledPathResult) {
-    console.log("!@#!@#", handledPathResult);
     if ("updated" === handledPathResult.resolution) {
-      //res.redirect(req.path + "?v=" + newFileVersion);
       //res.redirect(pathToHandle + "?v=" + newFileVersion);
       res.set('Content-Type', 'text/html');
-      res.send(req.path + "?v=" + handledPathResult.version);
+      return res.redirect(req.path + "?v=" + handledPathResult.version);
+      //res.send(req.path + "?v=" + handledPathResult.version);
     } else if ("up-to-date" === handledPathResult.resolution) {
       res.set('Content-Type', handledPathResult.contentType);
-      res.send(handledPathResult.data);
+      return res.send(handledPathResult.data);
     } else {
       res.set('Content-Type', 'text/html');
-      res.send("unknown resolution: " + handledPathResult.resolution);
+      return res.send("unknown resolution: " + handledPathResult.resolution);
     }
   }).catch(function(err) {
     res.set('Content-Type', 'text/html');
-    res.send(err);
+    return res.send(err);
   });
 };
 
@@ -396,7 +396,7 @@ var promiseToListenForHttpRequests = function() {
       }
     });
     app.get('/favicon.ico', function(req, res) {
-      res.status(404).send('Not Found');
+      return res.status(404).send('Not Found');
     });
     app.get('/stream', function(req, res) {
       var messageCount = 0;
@@ -417,10 +417,10 @@ var promiseToListenForHttpRequests = function() {
         'Connection': 'keep-alive'
       });
       res.write('\n');
+      //TODO: !!!
       req.on("close", function() { });
       promiseToListAllFilesToSync().then(function(allFiles) {
         allFiles.forEach(function(interestingFile) {
-          console.log(allFiles);
           if (isOkFilename(interestingFile)) {
             promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
               sendFile(interestingFile, allVersions);
@@ -430,14 +430,13 @@ var promiseToListenForHttpRequests = function() {
           }
         });
         return promiseToListFolderfilesToSync().then(function(foldersToSync) {
-          console.log(foldersToSync);
           return promiseToWatchFilesFromFolders(foldersToSync, sendFile);
         });
       });
     });
     app.use(handlePath);
     app.use(express.static(path.dirname(config['-f']) + '/' + config['publicDir']));
-    resolve(app.listen(config['-p']));
+    return resolve(app.listen(config['-p']));
   });
 };
 
@@ -447,5 +446,5 @@ Promise.resolve()
 .then(promiseToCreateStaticFileCabinetDirectory)
 .then(promiseToListenForHttpRequests)
 .catch(function(err) {
-  console.log(err);
+  console.log("global chain error:" + err);
 });
