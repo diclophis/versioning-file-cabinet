@@ -36,7 +36,8 @@ var Client = React.createClass({
       resourceFrameSrc: null,
       files: {},
       selectedVersions: {},
-      onResourceClicked: this.onResourceClicked
+      onResourceClicked: this.onResourceClicked,
+      onVersionChanged: this.onVersionChanged
     };
   },
   componentWillMount: function() {
@@ -57,6 +58,17 @@ var Client = React.createClass({
     //  }
     //}, 66);
   },
+  onVersionChanged: function(ev) {
+    console.log(ev.target.dataset.filename);
+    var setList = {};
+    setList[ev.target.dataset.filename] = ev.target.value;
+    var nestedSet = { $merge: setList }
+    var newState = ReactUpdate(this.state, {
+      selectedVersions: nestedSet
+    });
+    this.setState(newState);
+    console.log(this.state);
+  },
   render: function() {
     var resourceLinks = [];
     var filenames = Object.keys(this.state.files);
@@ -64,10 +76,13 @@ var Client = React.createClass({
       var versionInputs = [];
       var link = React.createElement("a", {key: filename, href: filename, onClick: this.onResourceClicked}, filename);
       versionInputs.push(link);
+      var selectedIndex = this.state.selectedVersions[filename] || this.state.files[filename].versions[(this.state.files[filename].versions.length - 1)];
+      //versionInputs[1 + selectedIndex].props.checked = true;
+      console.log(selectedIndex, versionInputs);
       this.state.files[filename].versions.forEach(function(version) {
-        var versionInput = React.createElement("input", {key: version, type: "radio", value: version}, null);
+        var versionInput = React.createElement("input", {onChange: this.onVersionChanged, "data-filename": filename, key: version, type: "radio", value: version, checked: selectedIndex === version}, null);
         versionInputs.push(versionInput);
-      });
+      }.bind(this));
 
       var resourceLink = React.createElement("p", {key: filename},
         versionInputs
