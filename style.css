@@ -17,3 +17,17 @@ iframe {
 #markdown img {
   max-width: 42em;
 }
+
+pre, pre code {
+  background: #b1b1b1;
+}
+
+pre {
+  padding: 1em 0.33em 1em 0.33em;
+  overflow: scroll;
+}
+
+code {
+  background-color: #e0e0e0;
+  padding: 0 0.33em 0 0.33em;
+}
