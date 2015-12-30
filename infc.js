@@ -143,7 +143,9 @@ var promiseToCreateStaticFileCabinetDirectory = function() {
     config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/" + config['publicDir'] + "/.sfc/";
     fs.access(config['staticFileCabinetDirectory'], fs.R_OK | fs.W_OK, function (err) {
       if (err) {
-        fs.mkdir(config['staticFileCabinetDirectory'], function(err) {
+        //fs.mkdir(config['staticFileCabinetDirectory'], function(err) {
+        var mkdirSfc = spawn("sh", ["mkdir -p " + config['staticFileCabinetDirectory']]);
+        mkdirSfc.stdout.on('close', function(err) {
           if (err) { return reject(err); }
           return resolve(config['staticFileCabinetDirectory']);
         });
