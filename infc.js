@@ -33,7 +33,21 @@ var express = require('express');
 var MemoryFS = require("memory-fs");
 var webpack = require("webpack");
 var marked = require('marked');
+var React = require('react');
+var ReactDOM = require('react-dom');
+var ReactDOMServer = require('react-dom/server');
+var HTMLDocument = require('react-html-document');
 
+var MarkdownHTMLBody = React.createClass({
+  getInitialState: function() {
+    return {
+      htmlFromMarkdown: marked(this.props.markdown)
+    };
+  },
+  render: function() {
+    return React.createElement("div", {id: "markdown-container", dangerouslySetInnerHTML: {__html: this.state.htmlFromMarkdown}}, null);
+  }
+});
 
 //TODO: move all config into module
 var webpackConfig = {
@@ -328,6 +342,17 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                       checkPath = config['staticFileCabinetDirectory'] + "/VERSIONS/public/" + pathToHandle + "/" + desiredVersion;
                     }
                     fs.readFile(checkPath, function (err, data) {
+                      switch(contentType) {
+                        case 'text/x-markdown':
+                          var markdownHtml = React.createElement(MarkdownHTMLBody, {markdown: data.toString()}, null);
+                          var markdownDocument = React.createElement(HTMLDocument, {title: checkPath}, markdownHtml);
+
+                          data = ReactDOMServer.renderToStaticMarkup(markdownDocument);
+                          contentType = 'text/html';
+                        break;
+
+                        default:
+                      }
                       if (err) { return reject(err); }
                       return resolve({resolution: "up-to-date", data: data, contentType: contentType});
                     });

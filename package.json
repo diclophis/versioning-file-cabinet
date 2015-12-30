@@ -20,7 +20,8 @@
     "memory-fs": "~0.3",
     "react": "~0.14",
     "react-dom": "~0.14",
-    "react-addons-update": "0.14",
+    "react-addons-update": "~0.14",
+    "react-html-document": "~2.0",
     "css-loader": "~0.23",
     "style-loader": "~0.13",
     "marked": "~0.3"
