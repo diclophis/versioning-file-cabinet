@@ -1,26 +1,5 @@
 "use strict";
-/*
-// versioning-file-cabinet
-// INBOX
-// files named as their hashs
-// f83d1e71be12ea4fd9409fc917925aadc792a014  /Users/mavenlink/Downloads/001.gif
-// VERSIONS
-// ?v=
 
-  public/
-    .vfc
-      DELETED => /dev/null
-      FILES/
-        sha2/5/6/index
-
-      VERSIONS/
-        infc.gif/
-          .deleted => ../../DELETED
-          000000 => ../FILES/sha2/5/6/index
-
-    infc.gif => .vfc/VERSIONS/infc.gif/000000
-
-*/
 
 var crypto = require('crypto');
 var spawn = require('child_process').spawn;
@@ -45,7 +24,10 @@ var MarkdownHTMLBody = React.createClass({
     };
   },
   render: function() {
-    return React.createElement("div", {id: "markdown-container", dangerouslySetInnerHTML: {__html: this.state.htmlFromMarkdown}}, null);
+    var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
+    //var clientScript = null;
+    var markdownDiv = React.createElement("div", {key: "markdown-container", dangerouslySetInnerHTML: {__html: this.state.htmlFromMarkdown}}, null);
+    return React.createElement("div", {id: "markdown"}, [clientScript, markdownDiv]);
   }
 });
 
@@ -143,7 +125,6 @@ var promiseToCreateStaticFileCabinetDirectory = function() {
     config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/" + config['publicDir'] + "/.sfc/";
     fs.access(config['staticFileCabinetDirectory'], fs.R_OK | fs.W_OK, function (err) {
       if (err) {
-        //fs.mkdir(config['staticFileCabinetDirectory'], function(err) {
         var mkdirSfc = spawn("sh", ["mkdir -p " + config['staticFileCabinetDirectory']]);
         mkdirSfc.stdout.on('close', function(err) {
           if (err) { return reject(err); }
@@ -188,24 +169,30 @@ var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
       if (false === isSync) {
         isSync = true;
         promiseToListAllFilesToSync().then(function(allFiles) {
+          var sequence = Promise.resolve();
+
           allFiles.forEach(function(interestingFile) {
             var isInteresting = true;
             if (filename && !interestingFile.endsWith(filename)) {
               isInteresting = false;
             }
             if (isInteresting) {
-              promiseToHandlePath("/" + interestingFile).then(function(handledPathResult) {
-                promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
-                  sendFile(interestingFile, allVersions);
+              sequence = sequence.then(function() {
+                promiseToHandlePath("/" + interestingFile).then(function(handledPathResult) {
+                  promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
+                    sendFile(interestingFile, allVersions);
+                  }).catch(function(err) {
+                    console.log("error listing versions", err);
+                  });
                 }).catch(function(err) {
-                  console.log("error listing versions", err);
+                  console.log("error handling file", err, interestingFile);
                 });
-              }).catch(function(err) {
-                console.log("error handling file", err, interestingFile);
               });
             }
           });
-          isSync = false;
+          sequence.then(function() {
+            isSync = false;
+          });
         }).catch(function(err) {
           console.log("cant list all files", err);
           isSync = false;
@@ -237,7 +224,9 @@ var promiseToListFolderfilesToSync = function() {
 var loadIndexHtml = function() {
   return new Promise(function(resolve, reject) {
     var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
-    var indexDocument = React.createElement(HTMLDocument, {title: "versioning-file-cabinet"}, clientScript); 
+    var versioningFileCabinetDiv = React.createElement("div", {id: "versioning-file-cabinet", key: "versioning-file-cabinet"}, null);
+    var otherDiv = React.createElement("div", {key: "other-div"}, [versioningFileCabinetDiv, clientScript]);
+    var indexDocument = React.createElement(HTMLDocument, {title: "versioning-file-cabinet"}, otherDiv);
     return resolve(ReactDOMServer.renderToStaticMarkup(indexDocument));
   });
 };

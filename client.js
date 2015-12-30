@@ -1,3 +1,5 @@
+"use strict";
+
 var React = require('react');
 var ReactDOM = require('react-dom');
 var ReactUpdate = require('react-addons-update');
@@ -40,7 +42,6 @@ var Client = React.createClass({
   componentWillMount: function() {
     bindFilesystemEventInterface(this);
     //TODO: !!!!
-    //console.log('!@#!@#!@#');
     window.onpopstate = function(event) {
       //if (event.state && event.state.frame) {
       //  console.log("POPPP", event.state.frame);
@@ -59,12 +60,26 @@ var Client = React.createClass({
   },
   onVersionChanged: function(ev) {
     var setList = {};
+    console.log(ev.target.form.dataset.version);
     setList[ev.target.dataset.filename] = ev.target.value;
     var nestedSet = { $merge: setList }
     var newState = ReactUpdate(this.state, {
       selectedVersions: nestedSet
     });
     this.setState(newState);
+
+    console.log(ev.target.value);
+    console.log(document.getElementById("resource").contentWindow.document.images);
+    var imgs = document.getElementById("resource").contentWindow.document.images;
+    for (var i=0; i<imgs.length; i++) {
+      var img = imgs[i];
+      var currentSrc = img.src;
+      var foundFile = currentSrc.indexOf(ev.target.form.id);
+      if (foundFile) {
+        var newSrc = (currentSrc.substring(0, foundFile) + ev.target.form.id + '?v=' + ev.target.value);
+        img.src = newSrc;
+      }
+    }
   },
   onKeepHistorySynced: function(intendedResource) {
     //history.pushState({frame: intendedResource}, intendedResource, null);
@@ -83,19 +98,21 @@ var Client = React.createClass({
         var versionInput = React.createElement("input", {onMouseOver: this.onVersionChanged, onChange: this.onVersionChanged, "data-filename": filename, key: version, type: "radio", value: version, checked: selectedIndex === version}, null);
         versionInputs.push(versionInput);
       }.bind(this));
-      var resourceLink = React.createElement("p", {key: filename},
-        versionInputs
-      );
+      var resourceLink = React.createElement("form", {id: filename, key: filename}, versionInputs);
+        //React.createElement("p", {key: filename},
+      //);
       resourceLinks.push(resourceLink);
     }.bind(this));
     if (this.state.resourceFrameSrc && this.state.files[this.state.resourceFrameSrc]) {
-      var resourceFrame = React.createElement("iframe", {key: "resource-frame", src: this.state.resourceFrameSrc + "?v=" + (this.state.selectedVersions[this.state.resourceFrameSrc] || this.state.files[this.state.resourceFrameSrc].versions[(this.state.files[this.state.resourceFrameSrc].versions.length - 1)])});
+      var resourceFrame = React.createElement("iframe", {id: "resource", key: "resource-frame", src: this.state.resourceFrameSrc + "?v=" + (this.state.selectedVersions[this.state.resourceFrameSrc] || this.state.files[this.state.resourceFrameSrc].versions[(this.state.files[this.state.resourceFrameSrc].versions.length - 1)])});
       resourceLinks.push(resourceFrame);
     }
     return React.createElement("div", null, resourceLinks);
   }
 });
 
-
-ReactDOM.render(React.createElement(Client), document.getElementById("app"));
+var app = null;
+if (app = document.getElementById("versioning-file-cabinet")) {
+  ReactDOM.render(React.createElement(Client), document.getElementById("versioning-file-cabinet"));
+}
 require("./style.css");
