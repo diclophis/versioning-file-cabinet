@@ -1,3 +1,4 @@
+"use strict";
 /*
 // versioning-file-cabinet
 // INBOX
@@ -31,6 +32,7 @@ var Promise = require('es6-promise').Promise;
 var express = require('express');
 var MemoryFS = require("memory-fs");
 var webpack = require("webpack");
+var marked = require('marked');
 
 
 //TODO: move all config into module
@@ -378,7 +380,7 @@ var handlePath = function(req, res, next) {
 
 var promiseToListenForHttpRequests = function() {
   return new Promise(function(resolve, reject) {
-    app = express();
+    var app = express();
     app.use(function(req, res, next) {
       var isRoot = '/' === req.path;
       var isInterfaceJavascript = '' === req.query.interfaceJavascript;
