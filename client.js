@@ -11,8 +11,6 @@ var bindFilesystemEventInterface = function(reactComp) {
   if (!inFrame) {
     var resourceFrame = null;
     var preloadedSrc = "about:blank";
-
-
     var source = new EventSource("/stream");
     source.addEventListener("message", function(e) {
       var fileState = JSON.parse(e.data);
@@ -61,24 +59,23 @@ var Client = React.createClass({
   },
   onVersionChanged: function(ev) {
     var setList = {};
-    console.log(ev.target.form.dataset.version);
     setList[ev.target.dataset.filename] = ev.target.value;
     var nestedSet = { $merge: setList }
     var newState = ReactUpdate(this.state, {
       selectedVersions: nestedSet
     });
     this.setState(newState);
-
-    console.log(ev.target.value);
-    console.log(document.getElementById("resource").contentWindow.document.images);
-    var imgs = document.getElementById("resource").contentWindow.document.images;
-    for (var i=0; i<imgs.length; i++) {
-      var img = imgs[i];
-      var currentSrc = img.src;
-      var foundFile = currentSrc.indexOf(ev.target.form.id);
-      if (foundFile) {
-        var newSrc = (currentSrc.substring(0, foundFile) + ev.target.form.id + '?v=' + ev.target.value);
-        img.src = newSrc;
+    var ifr = null;
+    if (ifr = document.getElementById("resource")) {
+      var imgs = ifr.contentWindow.document.images;
+      for (var i=0; i<imgs.length; i++) {
+        var img = imgs[i];
+        var currentSrc = img.src;
+        var foundFile = currentSrc.indexOf(ev.target.form.id);
+        if (foundFile) {
+          var newSrc = (currentSrc.substring(0, foundFile) + ev.target.form.id + '?v=' + ev.target.value);
+          img.src = newSrc;
+        }
       }
     }
   },

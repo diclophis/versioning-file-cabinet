@@ -157,49 +157,50 @@ var promiseToCreateStaticFileCabinetDirectory = function() {
 };
 
 
-var promiseToWatchFilesFromFolders = function(validDirsToWatch, sendFile) {
-  validDirsToWatch.forEach(function(validDirAndTildeScape, index, array) {
-    var tildeScape = validDirAndTildeScape[0];
-    var validDir = validDirAndTildeScape[1];
-    var isSync = false;
-    fs.watch(validDir, function (event, filename) {
-      if (!isOkFilename(filename)) {
-        return;
+var promiseToWatchFilesFromFolders = function(allFiles, validDirsToWatch, sendFile) {
+  var inspectFile = function(interestingFile) {
+    return new Promise(function(resolve, reject) {
+      if (!isOkFilename(interestingFile)) {
+        return reject();
       }
-      if (false === isSync) {
-        isSync = true;
-        promiseToListAllFilesToSync().then(function(allFiles) {
-          var sequence = Promise.resolve();
-
-          allFiles.forEach(function(interestingFile) {
-            var isInteresting = true;
-            if (filename && !interestingFile.endsWith(filename)) {
-              isInteresting = false;
-            }
-            if (isInteresting) {
-              sequence = sequence.then(function() {
-                promiseToHandlePath("/" + interestingFile).then(function(handledPathResult) {
-                  promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
-                    sendFile(interestingFile, allVersions);
-                  }).catch(function(err) {
-                    console.log("error listing versions", err);
-                  });
-                }).catch(function(err) {
-                  console.log("error handling file", err, interestingFile);
-                });
-              });
-            }
-          });
-          sequence.then(function() {
-            isSync = false;
-          });
+      promiseToHandlePath(interestingFile, null).then(function(handledPathResult) {
+      console.log("wtf");
+        promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
+          console.log("sending", interestingFile);
+          sendFile(interestingFile, allVersions);
+          resolve();
         }).catch(function(err) {
-          console.log("cant list all files", err);
-          isSync = false;
+          console.log("error listing versions", err);
         });
-      } else {
-        console.log("DOUBLE");
-      }
+      }).catch(function(err) {
+        console.log("error handling file", err, interestingFile);
+      });
+    });
+  };
+  var foop = function(iallFiles) {
+    var allP = [];
+    iallFiles.forEach(function(interestingFile) {
+      allP.push(inspectFile(interestingFile));
+    });
+    return Promise.all(allP);
+  };
+  return foop(allFiles).then(function() {
+    validDirsToWatch.forEach(function(validDirAndTildeScape, index, array) {
+      var tildeScape = validDirAndTildeScape[0];
+      var validDir = validDirAndTildeScape[1];
+      var waiter = false;
+      fs.watch(validDir, function (fileEvent, filename) {
+        if (waiter) {
+          clearTimeout(waiter);
+        }
+        waiter = setTimeout(function() {
+          promiseToListAllFilesToSync().then(function(allFiles) {
+            foop(allFiles);
+          }).catch(function(err) {
+            console.log("cant list all files", err);
+          });
+        }, 2);
+      });
     });
   });
 };
@@ -273,7 +274,7 @@ var promiseToCopyFile = function(source, sfcPath, requested) {
       var target = sfcPath + "FILES/" + splitDirPath;
       var versionsPath = sfcPath + "VERSIONS/" + requested;
       var indexPath = "index" + path.extname(source);
-      var mkdirAndCopyAndSymlink = "mkdir -p " + versionsPath + " && mkdir -p " + target + " && cp " + source + " " + target + "/" + indexPath + " && mkdir -p " + path.dirname(requested) + " && export VERSION=$(ls -1 " + versionsPath + " | wc -l | awk '{ printf(\"%06d\", $1) }')" + " && ln -s " + target + "/" + indexPath + " " + versionsPath + "/$VERSION && ln -sf " + versionsPath + "/$VERSION " + requested + " && echo $VERSION";
+      var mkdirAndCopyAndSymlink = "mkdir -p " + versionsPath + " && mkdir -p " + target + " && cp " + source + " " + target + "/" + indexPath + " && mkdir -p " + path.dirname(requested) + " && export VERSION=$(echo " + splitDirPath + " | tr / -)" + " && ln -s " + target + "/" + indexPath + " " + versionsPath + "/$VERSION && ln -sf " + versionsPath + "/$VERSION " + requested + " && echo $VERSION";
       var fileListingProcess = spawn("sh", ["-c", mkdirAndCopyAndSymlink]);
       var version = null;
       fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
@@ -297,15 +298,15 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
     if (!isOkFilename(pathToHandle)) {
       return reject("invalid filename!!!!", pathToHandle);
     }
-    var requestedTildeScape = pathToHandle.split("/")[1];
+    var requestedTildeScape = ("/" + pathToHandle).split("/")[1];
     promiseToListFolderfilesToSync().then(function(foldersToSyncAndTildeScapes) {
       foldersToSyncAndTildeScapes.forEach(function(folderToSyncAndTildeScape) {
         var foundTildeScape = folderToSyncAndTildeScape[0];
         var folderToSync = folderToSyncAndTildeScape[1];
         if (foundTildeScape === requestedTildeScape) {
-          var checkPath = config['publicDir'] + pathToHandle;
+          var checkPath = config['publicDir'] + "/" + pathToHandle;
           fs.realpath(checkPath, function(err, versionPath) {
-            var existingFile = path.dirname(folderToSync) + pathToHandle;
+            var existingFile = path.dirname(folderToSync) + "/" + pathToHandle;
             if (err) {
               if ('ENOENT' === err.code) {
                   promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
@@ -332,19 +333,20 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                     var contentType = (lookup(checkPath) || 'application/octet-stream');
                     if (desiredVersion) {
                       checkPath = config['staticFileCabinetDirectory'] + "/VERSIONS/public/" + pathToHandle + "/" + desiredVersion;
+                    } else {
+                      checkPath = config['resolvedFolerfileDirname'] + "/public/" + pathToHandle;
                     }
                     fs.readFile(checkPath, function (err, data) {
+                      if (err) { return reject(err); }
                       switch(contentType) {
                         case 'text/x-markdown':
                           var markdownHtml = React.createElement(ReactMarkdown, {markdown: data.toString()}, null);
                           var markdownDocument = React.createElement(HTMLDocument, {title: checkPath}, markdownHtml);
-
                           data = ReactDOMServer.renderToStaticMarkup(markdownDocument);
                           contentType = 'text/html';
                         break;
                         default:
                       }
-                      if (err) { return reject(err); }
                       return resolve({resolution: "up-to-date", data: data, contentType: contentType});
                     });
                   } else if (trimmedLine.endsWith(': FAILED')) {
@@ -374,7 +376,7 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
 
 
 var vfcHandler = function(req, res, next) {
-  promiseToHandlePath(req.path, req.query.v).then(function(handledPathResult) {
+  promiseToHandlePath(req.path.substring(1, req.path.length), req.query.v).then(function(handledPathResult) {
     if ("updated" === handledPathResult.resolution) {
       res.set('Content-Type', 'text/html');
       return res.redirect(req.path + "?v=" + handledPathResult.version);
@@ -454,17 +456,8 @@ var promiseToListenForHttpRequests = function() {
       //TODO: !!!
       req.on("close", function() { });
       promiseToListAllFilesToSync().then(function(allFiles) {
-        allFiles.forEach(function(interestingFile) {
-          if (isOkFilename(interestingFile)) {
-            promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
-              sendFile(interestingFile, allVersions);
-            }).catch(function(err) {
-              console.log("error listing versions", err);
-            });
-          }
-        });
         return promiseToListFolderfilesToSync().then(function(foldersToSync) {
-          return promiseToWatchFilesFromFolders(foldersToSync, sendFile);
+          return promiseToWatchFilesFromFolders(allFiles, foldersToSync, sendFile);
         });
       });
     });
