@@ -97,5 +97,5 @@ var Client = React.createClass({
 });
 
 
-ReactDOM.render(React.createElement(Client), document.getElementById("index"));
+ReactDOM.render(React.createElement(Client), document.getElementById("app"));
 require("./style.css");

@@ -49,6 +49,7 @@ var MarkdownHTMLBody = React.createClass({
   }
 });
 
+
 //TODO: move all config into module
 var webpackConfig = {
   node: {
@@ -231,12 +232,13 @@ var promiseToListFolderfilesToSync = function() {
 };
 
 
-var loadIndexHtml = new Promise(function(resolve, reject) {
-  fs.readFile(config['publicDir'] + '/index.html', function(err, data) {
-    if (err) { return reject(err); }
-    return resolve(data);
+var loadIndexHtml = function() {
+  return new Promise(function(resolve, reject) {
+    var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
+    var indexDocument = React.createElement(HTMLDocument, {title: "versioning-file-cabinet"}, clientScript); 
+    return resolve(ReactDOMServer.renderToStaticMarkup(indexDocument));
   });
-});
+};
 
 
 var promiseToListAllFilesToSync = function() {
@@ -414,9 +416,13 @@ var promiseToListenForHttpRequests = function() {
       if (redirectToIndexHtml) {
         res.redirect('/index.html');
       } else if (respondWithInterfaceHtml) {
-        loadIndexHtml.then(function(data) {
+        loadIndexHtml().then(function(data) {
           res.set('Content-Type', 'text/html');
           res.send(data);
+        }).catch(function(err) {
+          res.set('Content-Type', 'text/plain');
+          res.status(500);
+          res.send(err);
         });
       } else if (isInterfaceJavascript) {
         //TODO: ...
