@@ -1,6 +1,5 @@
 "use strict";
 
-
 var crypto = require('crypto');
 var spawn = require('child_process').spawn;
 var path = require('path');
@@ -16,20 +15,6 @@ var React = require('react');
 var ReactDOM = require('react-dom');
 var ReactDOMServer = require('react-dom/server');
 var HTMLDocument = require('react-html-document');
-
-var MarkdownHTMLBody = React.createClass({
-  getInitialState: function() {
-    return {
-      htmlFromMarkdown: marked(this.props.markdown)
-    };
-  },
-  render: function() {
-    var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
-    //var clientScript = null;
-    var markdownDiv = React.createElement("div", {key: "markdown-container", dangerouslySetInnerHTML: {__html: this.state.htmlFromMarkdown}}, null);
-    return React.createElement("div", {id: "markdown"}, [clientScript, markdownDiv]);
-  }
-});
 
 
 //TODO: move all config into module
@@ -66,13 +51,26 @@ process.argv.forEach(function (val, index, array) {
     poppingConfig = false;
   }
 });
-
-
 config['-p'] = config['-p'] || 3001;
 config['-f'] = config['-f'] || 'Folderfile';
 config['-h'] = config['-h'] || 'localhost';
 config['-c'] = null;
 config['publicDir'] = "public";
+
+
+//TODO: splitout react modules
+var ReactMarkdown = React.createClass({
+  getInitialState: function() {
+    return {
+      htmlFromMarkdown: marked(this.props.markdown)
+    };
+  },
+  render: function() {
+    var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
+    var markdownDiv = React.createElement("div", {key: "markdown-container", dangerouslySetInnerHTML: {__html: this.state.htmlFromMarkdown}}, null);
+    return React.createElement("div", {id: "markdown"}, [clientScript, markdownDiv]);
+  }
+});
 
 
 //TODO: flesh out list of bad filenames
@@ -86,6 +84,27 @@ var isOkFilename = function(filename) {
 };
 
 
+//TODO: util modules
+var splitChars = function(txt, num) {
+  var result = [];
+  for (var i = 0; i < txt.length; i += num) {
+    result.push(txt.substr(i, num));
+  }
+  return result;
+};
+
+
+var checksum = function(str, algorithm, encoding) {
+  return crypto.createHash(algorithm || 'md5').update(str, 'utf8').digest(encoding || 'hex');
+};
+
+
+var stringPresent = function(str) {
+  return !(null === str || 0 === str.length);
+};
+
+
+//TODO: abstract into promises tree
 var promiseToCompileMainJs = function() {
   return new Promise(function(resolve, reject) {
     compiler.run(function(err, stats) {
@@ -135,25 +154,6 @@ var promiseToCreateStaticFileCabinetDirectory = function() {
       }
     });
   });
-};
-
-
-var splitChars = function(txt, num) {
-  var result = [];
-  for (var i = 0; i < txt.length; i += num) {
-    result.push(txt.substr(i, num));
-  }
-  return result;
-};
-
-
-var checksum = function(str, algorithm, encoding) {
-  return crypto.createHash(algorithm || 'md5').update(str, 'utf8').digest(encoding || 'hex');
-};
-
-
-var stringPresent = function(str) {
-  return !(null === str || 0 === str.length);
 };
 
 
@@ -221,7 +221,7 @@ var promiseToListFolderfilesToSync = function() {
 };
 
 
-var loadIndexHtml = function() {
+var promiseToRenderIndexHtml = function() {
   return new Promise(function(resolve, reject) {
     var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
     var versioningFileCabinetDiv = React.createElement("div", {id: "versioning-file-cabinet", key: "versioning-file-cabinet"}, null);
@@ -297,7 +297,6 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
     if (!isOkFilename(pathToHandle)) {
       return reject("invalid filename!!!!", pathToHandle);
     }
-
     var requestedTildeScape = pathToHandle.split("/")[1];
     promiseToListFolderfilesToSync().then(function(foldersToSyncAndTildeScapes) {
       foldersToSyncAndTildeScapes.forEach(function(folderToSyncAndTildeScape) {
@@ -337,13 +336,12 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                     fs.readFile(checkPath, function (err, data) {
                       switch(contentType) {
                         case 'text/x-markdown':
-                          var markdownHtml = React.createElement(MarkdownHTMLBody, {markdown: data.toString()}, null);
+                          var markdownHtml = React.createElement(ReactMarkdown, {markdown: data.toString()}, null);
                           var markdownDocument = React.createElement(HTMLDocument, {title: checkPath}, markdownHtml);
 
                           data = ReactDOMServer.renderToStaticMarkup(markdownDocument);
                           contentType = 'text/html';
                         break;
-
                         default:
                       }
                       if (err) { return reject(err); }
@@ -375,13 +373,11 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
 };
 
 
-var handlePath = function(req, res, next) {
+var vfcHandler = function(req, res, next) {
   promiseToHandlePath(req.path, req.query.v).then(function(handledPathResult) {
     if ("updated" === handledPathResult.resolution) {
-      //res.redirect(pathToHandle + "?v=" + newFileVersion);
       res.set('Content-Type', 'text/html');
       return res.redirect(req.path + "?v=" + handledPathResult.version);
-      //res.send(req.path + "?v=" + handledPathResult.version);
     } else if ("up-to-date" === handledPathResult.resolution) {
       res.set('Content-Type', handledPathResult.contentType);
       return res.send(handledPathResult.data);
@@ -407,7 +403,7 @@ var promiseToListenForHttpRequests = function() {
       if (redirectToIndexHtml) {
         res.redirect('/index.html');
       } else if (respondWithInterfaceHtml) {
-        loadIndexHtml().then(function(data) {
+        promiseToRenderIndexHtml().then(function(data) {
           res.set('Content-Type', 'text/html');
           res.send(data);
         }).catch(function(err) {
@@ -441,7 +437,6 @@ var promiseToListenForHttpRequests = function() {
       var sendFile = (function(eventStreamResponse) {
         return function(filename, versions) {
           var stateOfFile = {
-          //stateOfFile[filename] = {
             path: filename,
             versions: versions
           };
@@ -473,7 +468,7 @@ var promiseToListenForHttpRequests = function() {
         });
       });
     });
-    app.use(handlePath);
+    app.use(vfcHandler);
     app.use(express.static(path.dirname(config['-f']) + '/' + config['publicDir']));
     return resolve(app.listen(config['-p']));
   });

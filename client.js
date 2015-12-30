@@ -5,6 +5,7 @@ var ReactDOM = require('react-dom');
 var ReactUpdate = require('react-addons-update');
 
 
+//TODO: refactor this
 var bindFilesystemEventInterface = function(reactComp) {
   var inFrame = (window.self !== window.top);
   if (!inFrame) {
@@ -99,8 +100,6 @@ var Client = React.createClass({
         versionInputs.push(versionInput);
       }.bind(this));
       var resourceLink = React.createElement("form", {id: filename, key: filename}, versionInputs);
-        //React.createElement("p", {key: filename},
-      //);
       resourceLinks.push(resourceLink);
     }.bind(this));
     if (this.state.resourceFrameSrc && this.state.files[this.state.resourceFrameSrc]) {
@@ -111,8 +110,12 @@ var Client = React.createClass({
   }
 });
 
+
+//NOTE: bind event handler component only if need-be
 var app = null;
 if (app = document.getElementById("versioning-file-cabinet")) {
   ReactDOM.render(React.createElement(Client), document.getElementById("versioning-file-cabinet"));
 }
-require("./style.css");
+
+
+var stylesheets = require("./style.css");
