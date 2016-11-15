@@ -22,7 +22,7 @@ var webpackConfig = {
   node: {
     console: true,
   },
-  entry: ["./client.js"],
+  entry: [ path.dirname(__filename) + "/client.js"],
   output: {
     path: '/',
     filename: "[name].js"
