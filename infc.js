@@ -164,7 +164,6 @@ var promiseToWatchFilesFromFolders = function(allFiles, validDirsToWatch, sendFi
         return reject();
       }
       promiseToHandlePath(interestingFile, null).then(function(handledPathResult) {
-      console.log("wtf");
         promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
           console.log("sending", interestingFile);
           sendFile(interestingFile, allVersions);
@@ -339,6 +338,7 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                     fs.readFile(checkPath, function (err, data) {
                       if (err) { return reject(err); }
                       switch(contentType) {
+                        case 'text/markdown':
                         case 'text/x-markdown':
                           var markdownHtml = React.createElement(ReactMarkdown, {markdown: data.toString()}, null);
                           var markdownDocument = React.createElement(HTMLDocument, {title: checkPath}, markdownHtml);
