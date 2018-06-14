@@ -163,6 +163,7 @@ var promiseToWatchFilesFromFolders = function(allFiles, validDirsToWatch, sendFi
       if (!isOkFilename(interestingFile)) {
         return reject();
       }
+      console.log("V is null");
       promiseToHandlePath(interestingFile, null).then(function(handledPathResult) {
         promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
           console.log("sending", interestingFile);
@@ -266,6 +267,7 @@ var promiseToListAllFilesToSync = function() {
 
 var promiseToCopyFile = function(source, sfcPath, requested) {
   return new Promise(function(resolve, reject) {
+    console.log("1", source);
     fs.readFile(source, function (err, data) {
       if (err) { return reject(err); }
       var checksumOfInboundFile = checksum(data, 'sha1');
@@ -335,8 +337,9 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                     } else {
                       checkPath = config['resolvedFolerfileDirname'] + "/public/" + pathToHandle;
                     }
+                    console.log("2", checkPath);
                     fs.readFile(checkPath, function (err, data) {
-                      if (err) { return reject(err); }
+                      if (err) { console.log(err); return reject(err); }
                       switch(contentType) {
                         case 'text/markdown':
                         case 'text/x-markdown':
@@ -350,10 +353,12 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                       return resolve({resolution: "up-to-date", data: data, contentType: contentType});
                     });
                   } else if (trimmedLine.endsWith(': FAILED')) {
+                    console.log("WTF");
                     promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
                       return resolve({resolution: "updated", version: newFileVersion});
                     });
                   } else {
+                    console.log("FART");
                     return reject(trimmedLine);
                   }
                 }
@@ -376,7 +381,10 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
 
 
 var vfcHandler = function(req, res, next) {
+  console.log("requesting V", req.query.v);
+
   promiseToHandlePath(req.path.substring(1, req.path.length), req.query.v).then(function(handledPathResult) {
+    console.log(handledPathResult);
     if ("updated" === handledPathResult.resolution) {
       res.set('Content-Type', 'text/html');
       return res.redirect(req.path + "?v=" + handledPathResult.version);
