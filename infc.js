@@ -53,9 +53,9 @@ process.argv.forEach(function (val, index, array) {
 });
 config['-p'] = config['-p'] || 3001;
 config['-f'] = config['-f'] || 'Folderfile';
-config['-h'] = config['-h'] || 'localhost';
+config['-h'] = config['-h'] || '0.0.0.0';
 config['-c'] = null;
-config['publicDir'] = "public";
+//config['publicDir'] = "public";
 
 
 //TODO: splitout react modules
@@ -120,7 +120,7 @@ var promiseToCompileMainJs = function() {
 
 var promiseToGetListOfVersions = function(path) {
   return new Promise(function(resolve, reject) {
-    fs.readdir(config['staticFileCabinetDirectory'] + "VERSIONS/public/" + path, function(err, files) {
+    fs.readdir(config['staticFileCabinetDirectory'] + "VERSIONS/" + path, function(err, files) {
       if (err) { return reject(err); }
       resolve(files);
     });
@@ -129,10 +129,14 @@ var promiseToGetListOfVersions = function(path) {
 
 
 var promiseToSetResolvedFolderfilePath = function() {
+  console.log("set resolved folderfilepath");
+
   return new Promise(function(resolve, reject) {
     fs.realpath(config['-f'], function(err, fullFolderfilePath) {
       if (err) { return reject(err); }
-      config['resolvedFolerfileDirname'] = path.dirname(fullFolderfilePath);
+      console.log(fullFolderfilePath);
+      config['resolvedFolerfileDirname'] = fullFolderfilePath; //path.dirname(fullFolderfilePath);
+      console.log("... setres", config);
       return resolve(fullFolderfilePath);
     });
   });
@@ -140,16 +144,22 @@ var promiseToSetResolvedFolderfilePath = function() {
 
 
 var promiseToCreateStaticFileCabinetDirectory = function() {
+  console.log("promiseToCreateStaticFileCabinetDirectory begin");
   return new Promise(function(resolve, reject) {
-    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/" + config['publicDir'] + "/.sfc/";
+    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/.sfc/";
     fs.access(config['staticFileCabinetDirectory'], fs.R_OK | fs.W_OK, function (err) {
+      console.log(err, config);
+
       if (err) {
-        var mkdirSfc = spawn("sh", ["mkdir -p " + config['staticFileCabinetDirectory']]);
+        var mkdirSfc = spawn("sh", ["-c", "mkdir -p " + config['staticFileCabinetDirectory']]);
+        console.log("mkdir sfc", config['staticFileCabinetDirectory']);
         mkdirSfc.stdout.on('close', function(err) {
+          console.log("wtf", err);
           if (err) { return reject(err); }
           return resolve(config['staticFileCabinetDirectory']);
         });
       } else {
+        console.log("end promiseToCreateStaticFileCabinetDirectory");
         return resolve(config['staticFileCabinetDirectory']);
       }
     });
@@ -186,10 +196,14 @@ var promiseToWatchFilesFromFolders = function(allFiles, validDirsToWatch, sendFi
   };
   return foop(allFiles).then(function() {
     validDirsToWatch.forEach(function(validDirAndTildeScape, index, array) {
+      console.log(validDirAndTildeScape);
+
       var tildeScape = validDirAndTildeScape[0];
       var validDir = validDirAndTildeScape[1];
       var waiter = false;
       fs.watch(validDir, function (fileEvent, filename) {
+        console.log(fileEvent, filename);
+
         if (waiter) {
           clearTimeout(waiter);
         }
@@ -208,16 +222,17 @@ var promiseToWatchFilesFromFolders = function(allFiles, validDirsToWatch, sendFi
 
 var promiseToListFolderfilesToSync = function() {
   return new Promise(function(resolve, reject) {
-    fs.readFile(config['-f'], 'utf8', function (err, data) {
-      if (err) { return reject(err); }
-      return resolve(data.split("\n").filter(function(element, index, array) {
-        return stringPresent(element)
-      }).map(function(element) {
-        element = element.replace("~", process.env.HOME);
-        var tildeScape = element.split("/").pop();
-        return [tildeScape, element];
-      }));
-    });
+    //fs.readFile(config['-f'], 'utf8', function (err, data) {
+    //  if (err) { return reject(err); }
+    //  return resolve(data.split("\n").filter(function(element, index, array) {
+    //    return stringPresent(element)
+    //  }).map(function(element) {
+    //    element = element.replace("~", process.env.HOME);
+    ///    var tildeScape = element.split("/").pop();
+    ///    return [tildeScape, element];
+    ///  }));
+    ///});
+    resolve([[config['-f'], "bar"]]);
   });
 };
 
@@ -237,6 +252,8 @@ var promiseToListAllFilesToSync = function() {
   var allFilesToSync = [];
   var allFileListingProcessPromises = [];
   return promiseToListFolderfilesToSync().then(function(foldersToSync) {
+    console.log("foldersToSync", foldersToSync);
+
     foldersToSync.forEach(function(folderToSyncAndTildeScape) {
       var tildeScape = folderToSyncAndTildeScape[0];
       var folderToSync = folderToSyncAndTildeScape[1];
@@ -296,30 +313,51 @@ var promiseToCopyFile = function(source, sfcPath, requested) {
 
 var promiseToHandlePath = function(pathToHandle, desiredVersion) {
   return new Promise(function(resolve, reject) {
+    console.log("handleThis", pathToHandle, desiredVersion);
+
     if (!isOkFilename(pathToHandle)) {
+      console.log("invalidFileName", pathToHandle);
+
       return reject("invalid filename!!!!", pathToHandle);
     }
     var requestedTildeScape = ("/" + pathToHandle).split("/")[1];
     promiseToListFolderfilesToSync().then(function(foldersToSyncAndTildeScapes) {
+      console.log(foldersToSyncAndTildeScapes);
+
       foldersToSyncAndTildeScapes.forEach(function(folderToSyncAndTildeScape) {
         var foundTildeScape = folderToSyncAndTildeScape[0];
         var folderToSync = folderToSyncAndTildeScape[1];
+        console.log("tildeScape", foundTildeScape, folderToSync, requestedTildeScape);
         if (foundTildeScape === requestedTildeScape) {
-          var checkPath = config['publicDir'] + "/" + pathToHandle;
+          var checkPath = pathToHandle;
+          console.log("checkPath", checkPath);
+
           fs.realpath(checkPath, function(err, versionPath) {
+
             var existingFile = path.dirname(folderToSync) + "/" + pathToHandle;
+
+
+            console.log("checkPathResol", checkPath, versionPath, existingFile);
+
             if (err) {
-              if ('ENOENT' === err.code) {
-                  promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
-                    return resolve({resolution: "updated", version: newFileVersion});
-                  }).catch(function(err) {
-                    return reject(err);
-                  });
-              } else {
-                return reject(err);
-              }
+              console.log("foopBasdasd", err);
+
+              //if ('ENOENT' === err.code) {
+              //    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
+              //      return resolve({resolution: "updated", version: newFileVersion});
+              //    }).catch(function(err) {
+              //      return reject(err);
+              //    });
+              //} else {
+              //  return reject(err);
+              //}
             } else {
               var shaDir = versionPath.replace(config['staticFileCabinetDirectory'] + "FILES/", "");
+
+              //wtf shaDir /home/multipass/workspace/versioning-file-cabinet/doc/README.md
+
+              console.log("wtf shaDir", shaDir);
+
               var shaParts = shaDir.split("/");
               shaParts.pop();
               var shasum = shaParts.join("");
@@ -333,7 +371,7 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                   if (trimmedLine.endsWith(': OK')) {
                     var contentType = (lookup(checkPath) || 'application/octet-stream');
                     if (desiredVersion) {
-                      checkPath = config['staticFileCabinetDirectory'] + "/VERSIONS/public/" + pathToHandle + "/" + desiredVersion;
+                      checkPath = config['staticFileCabinetDirectory'] + "/VERSIONS/" + pathToHandle + "/" + desiredVersion;
                     } else {
                       checkPath = config['resolvedFolerfileDirname'] + "/public/" + pathToHandle;
                     }
@@ -464,14 +502,15 @@ var promiseToListenForHttpRequests = function() {
       //TODO: !!!
       req.on("close", function() { });
       promiseToListAllFilesToSync().then(function(allFiles) {
+        console.log(allFiles);
         return promiseToListFolderfilesToSync().then(function(foldersToSync) {
           return promiseToWatchFilesFromFolders(allFiles, foldersToSync, sendFile);
         });
       });
     });
     app.use(vfcHandler);
-    app.use(express.static(path.dirname(config['-f']) + '/' + config['publicDir']));
-    return resolve(app.listen(config['-p']));
+    //app.use(express.static(path.dirname(config['-f']) + '/' + config['publicDir']));
+    return resolve(app.listen(config['-p'], config['-h']));
   });
 };
 
