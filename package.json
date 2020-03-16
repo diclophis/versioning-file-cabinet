@@ -8,23 +8,22 @@
     "url": "foo.git"
   },
   "main": "infc.js",
-  "devDependencies": {
-  },
+  "devDependencies": {},
   "optional": false,
   "dependencies": {
-    "express": "~4.8",
-    "es6-promise": "~2.3",
-    "event-stream": "~3.2",
-    "mime-types": "~2.1",
-    "webpack": "~1.12",
-    "memory-fs": "~0.3",
-    "react": "~0.14",
-    "react-dom": "~0.14",
-    "react-addons-update": "~0.14",
-    "react-html-document": "~2.0",
-    "css-loader": "~0.23",
-    "style-loader": "~0.13",
-    "marked": "~0.3"
+    "css-loader": "~3.4.2",
+    "es6-promise": "~4.2.8",
+    "event-stream": "~4.0.1",
+    "express": "~4.17.1",
+    "memory-fs": "~0.5.0",
+    "mime-types": "~2.1.26",
+    "react": "~16.13.0",
+    "react-addons-update": "~15.6.2",
+    "react-dom": "~16.13.0",
+    "react-html-document": "~3.1.0",
+    "style-loader": "~1.1.3",
+    "webpack": "~4.42.0",
+    "marked": "~0.7"
   },
   "scripts": {
     "test": "node infc.js -t"
