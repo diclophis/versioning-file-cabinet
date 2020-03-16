@@ -87,6 +87,7 @@ var Client = React.createClass({
   render: function() {
     var resourceLinks = [];
     var filenames = Object.keys(this.state.files);
+    console.log("filenames", filenames);
     filenames.sort().forEach(function(filename) {
       var versionInputs = [];
       var link = React.createElement("a", {key: filename, "data-filename": filename, href: "?" + filename, onClick: this.onResourceClicked}, filename);
@@ -116,3 +117,5 @@ if (app = document.getElementById("versioning-file-cabinet")) {
 
 
 var stylesheets = require("./style.css");
+
+console.log("got clientside");

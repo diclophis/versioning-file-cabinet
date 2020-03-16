@@ -16,6 +16,8 @@ var ReactDOM = require('react-dom');
 var ReactDOMServer = require('react-dom/server');
 var HTMLDocument = require('react-html-document');
 
+console.log("cheesE", HTMLDocument);
+
 
 //TODO: move all config into module
 var webpackConfig = {
@@ -28,11 +30,14 @@ var webpackConfig = {
     filename: "[name].js"
   },
   module: {
-    loaders: [
-      { test: /\.css$/, loader: "style!css" }
+    rules: [
+      //{ test: /\.css$/, loader: "style!css" }
+      { test: /\.css$/, use: "css-loader" }
     ]
   }
 }
+
+
 var poppingConfig = null;
 var config = {};
 var mfs = new MemoryFS();
@@ -51,6 +56,8 @@ process.argv.forEach(function (val, index, array) {
     poppingConfig = false;
   }
 });
+
+
 config['-p'] = config['-p'] || 3001;
 config['-f'] = config['-f'] || 'Folderfile';
 config['-h'] = config['-h'] || '0.0.0.0';
@@ -135,6 +142,7 @@ var promiseToSetResolvedFolderfilePath = function() {
     fs.realpath(config['-f'], function(err, fullFolderfilePath) {
       if (err) { return reject(err); }
       console.log(fullFolderfilePath);
+      throw 'wtf';
       config['resolvedFolerfileDirname'] = fullFolderfilePath; //path.dirname(fullFolderfilePath);
       console.log("... setres", config);
       return resolve(fullFolderfilePath);
@@ -242,7 +250,9 @@ var promiseToRenderIndexHtml = function() {
     var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
     var versioningFileCabinetDiv = React.createElement("div", {id: "versioning-file-cabinet", key: "versioning-file-cabinet"}, null);
     var otherDiv = React.createElement("div", {key: "other-div"}, [versioningFileCabinetDiv, clientScript]);
-    var indexDocument = React.createElement(HTMLDocument, {title: "versioning-file-cabinet"}, otherDiv);
+    console.log("a", HTMLDocument);
+    var indexDocument = React.createElement(HTMLDocument.default, {title: "versioning-file-cabinet"}, otherDiv);
+    console.log("b");
     return resolve(ReactDOMServer.renderToStaticMarkup(indexDocument));
   });
 };
@@ -258,6 +268,11 @@ var promiseToListAllFilesToSync = function() {
       var tildeScape = folderToSyncAndTildeScape[0];
       var folderToSync = folderToSyncAndTildeScape[1];
       var folderToSyncPrefix = path.basename(folderToSync);
+
+      console.log(tildeScape, folderToSync, folderToSyncPrefix);
+
+      throw "wtf2";
+
       //TODO: !!!!!
       var fileListingProcessPromise = new Promise(function(res, rej) {
         var fileListingProcess = spawn("find", ["-f", folderToSync]);
@@ -335,7 +350,6 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
           fs.realpath(checkPath, function(err, versionPath) {
 
             var existingFile = path.dirname(folderToSync) + "/" + pathToHandle;
-
 
             console.log("checkPathResol", checkPath, versionPath, existingFile);
 
@@ -448,6 +462,7 @@ var promiseToListenForHttpRequests = function() {
       var isInterfaceJavascript = '' === req.query.interfaceJavascript;
       var redirectToIndexHtml = isRoot && app.get('env') != 'development' && !isInterfaceJavascript;
       var respondWithInterfaceHtml = isRoot && app.get('env') === 'development' && !isInterfaceJavascript;
+      console.log(isRoot, isInterfaceJavascript, redirectToIndexHtml, respondWithInterfaceHtml);
       if (redirectToIndexHtml) {
         res.redirect('/index.html');
       } else if (respondWithInterfaceHtml) {
@@ -510,14 +525,15 @@ var promiseToListenForHttpRequests = function() {
     });
     app.use(vfcHandler);
     //app.use(express.static(path.dirname(config['-f']) + '/' + config['publicDir']));
+    console.log(config);
     return resolve(app.listen(config['-p'], config['-h']));
   });
 };
 
 
 Promise.resolve()
-.then(promiseToSetResolvedFolderfilePath)
-.then(promiseToCreateStaticFileCabinetDirectory)
+//.then(promiseToSetResolvedFolderfilePath)
+//.then(promiseToCreateStaticFileCabinetDirectory)
 .then(promiseToListenForHttpRequests)
 .catch(function(err) {
   console.log("global chain error:" + err);
