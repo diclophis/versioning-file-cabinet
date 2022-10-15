@@ -17,9 +17,7 @@ var ReactDOM = require('react-dom');
 var ReactDOMServer = require('react-dom/server');
 var HTMLDocument = require('react-html-document');
 
-
-console.log("Initial HTMLDocument", HTMLDocument);
-
+//console.log("Initial HTMLDocument", HTMLDocument);
 
 //TODO: move all config into module
 var webpackConfig = {
@@ -68,18 +66,14 @@ config['-c'] = null;
 
 
 //TODO: splitout react modules
-var ReactMarkdown = React.createClass({
-  getInitialState: function() {
-    return {
-      htmlFromMarkdown: marked(this.props.markdown)
-    };
-  },
-  render: function() {
-    var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
-    var markdownDiv = React.createElement("div", {key: "markdown-container", dangerouslySetInnerHTML: {__html: this.state.htmlFromMarkdown}}, null);
-    return React.createElement("div", {id: "markdown"}, [clientScript, markdownDiv]);
-  }
-});
+//var ReactMarkdown = React.createClass({
+//  getInitialState: function() {
+//    return {
+//    };
+//  },
+//  render: function() {
+//  }
+//});
 
 
 //TODO: flesh out list of bad filenames
@@ -204,6 +198,7 @@ var promiseToWatchFilesFromFolders = function(allFiles, validDirsToWatch, sendFi
       }).catch(function(err) {
         console.log("error handling file", err, interestingFile);
       });
+
     });
   };
   var foop = function(iallFiles) {
@@ -319,9 +314,10 @@ var promiseToListAllFilesToSync = function() {
         console.log("find these files", "find", findArgs);
 
         fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
-          console.log("AAA", data);
 
           if (stringPresent(data) && folderToSync != data) {
+            console.log("AAA", data);
+
             var canonFile = folderToSyncPrefix + data.replace(folderToSync, '');
             allFilesToSync.push(canonFile);
           }
@@ -394,27 +390,30 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
         var foundTildeScape = folderToSyncAndTildeScape[0];
         var folderToSync = folderToSyncAndTildeScape[1];
 
-        console.log("tildeScape", requestedTildeScape, foundTildeScape, folderToSync, requestedTildeScape);
+        console.log("tildeScape 123", requestedTildeScape, foundTildeScape, folderToSync, requestedTildeScape);
 
 //this is list of files [ [ 'Folderfile.example', 'doc' ] ]
 //tildeScape Folderfile.example doc doc
+//tildeScape doc doc doc doc
 
+        if (foundTildeScape != requestedTildeScape) {
+          console.log("FOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
+          console.log("FOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
+          console.log("FOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
+          console.log("FOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
+        } else {
 
-        if (foundTildeScape === requestedTildeScape) {
-
-          var checkPath = pathToHandle;
-          console.log("checkPath", checkPath);
+          var checkPathFoo = pathToHandle;
+          console.log("checkPathFoo", checkPathFoo, versionPath);
 
           //checkPath doc/.sfcFILES/f1d2d2f9/24e986ac/86fdf7b3/6c94bcdf/32beec15/index.md
           //checkPathResol doc/.sfcFILES/f1d2d2f9/24e986ac/86fdf7b3/6c94bcdf/32beec15/index.md /home/app/doc/.sfcFILES/f1d2d2f9/24e986ac/86fdf7b3/6c94bcdf/32beec15/index.md ./doc/.sfcFILES/f1d2d2f9/24e986ac/86fdf7b3/6c94bcdf/32beec15/index.md
 
-
-
-          fs.realpath(checkPath, function(err, versionPath) {
+          fs.realpath(checkPathFoo, function(err, versionPath) {
 
             var existingFile = path.dirname(folderToSync) + "/" + pathToHandle;
 
-            console.log("checkPathResol", checkPath, versionPath, existingFile);
+            console.log("checkPathResol", checkPathFoo, versionPath, existingFile);
 
 ///checkPath doc/foo.md
 ///checkPathResol doc/foo.md /home/app/doc/foo.md ./doc/foo.md
@@ -446,12 +445,14 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
               //}
 
             } else {
+
+            console.log("VERSION PATH", versionPath);
+
               // desiredVersion
               var shaDir = versionPath.replace("/home/app/" + config['staticFileCabinetDirectory'] + "/FILES/", "");
 
               //wtf shaDir /home/app/23069de9/0b647771/89969bde/a04e1efe/608b2765/index.md
               //wtf shaDir /home/multipass/workspace/versioning-file-cabinet/doc/README.md
-
 
               var shaParts = shaDir.split("/");
               shaParts.pop();
@@ -461,37 +462,51 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
 
               console.log("wtf shaDir", shaDir, shasum);
 
+//checkPathResol doc/foo2.md /home/app/doc/foo2.md ./doc/foo2.md
+//wtf shaDir /home/app/doc/foo2.md homeappdoc
+//shasum error: shasum: standard input: no properly formatted SHA checksum lines found doc/foo2.md ./doc/foo2.md doc/.sfc
+
+
               shaCheckingProcess.stdin.write(shaSumInput);
               shaCheckingProcess.stdin.end();
               shaCheckingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
                 var trimmedLine = data.trim();
                 if (0 != trimmedLine.length) {
                   if (trimmedLine.endsWith(': OK')) {
-                    var contentType = (lookup(checkPath) || 'application/octet-stream');
+                    var contentType = (lookup(checkPathFoo) || 'application/octet-stream');
+                    var checkPath4 = null;
                     if (desiredVersion) {
-                      checkPath = config['staticFileCabinetDirectory'] + "/VERSIONS/" + pathToHandle + "/" + desiredVersion;
+                      checkPath4 = config['staticFileCabinetDirectory'] + "/VERSIONS/" + pathToHandle + "/" + desiredVersion;
                     } else {
                       //checkPath = config['resolvedFolerfileDirname'] + "/" + pathToHandle;
                       //TODO: safety checks
-                      checkPath = pathToHandle;
+                      checkPath4 = pathToHandle;
                     }
 
 //wtf shaDir f1d2d2f9/24e986ac/86fdf7b3/6c94bcdf/32beec15/index.md f1d2d2f924e986ac86fdf7b36c94bcdf32beec15
 //2 doc/public/doc/foo2.md
 
 
-                    console.log("2", checkPath);
-                    fs.readFile(checkPath, function (err, data) {
+                    console.log("2", checkPathFoo, checkPath4);
+                    fs.readFile(checkPath4, function (err, data) {
                       if (err) { console.log(err); return reject(err); }
                       switch(contentType) {
                         case 'text/markdown':
                         case 'text/x-markdown':
                           console.log("HTMLDoc", HTMLDocument);
 
-                          console.log("ReactMarkdown", ReactMarkdown);
+                          console.log("ReactMarkdown", marked);
 
-                          var markdownHtml = React.createElement(ReactMarkdown, {markdown: data.toString()}, null);
-                          var markdownDocument = React.createElement(HTMLDocument, {title: checkPath}, markdownHtml);
+    var htmlFromMarkdown = marked.parse(data.toString());
+    var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
+    var markdownDiv = React.createElement("div", {key: "markdown-container", dangerouslySetInnerHTML: {__html: htmlFromMarkdown}}, null);
+
+                          var markdownHtml = React.createElement("div", {id: "markdown"}, [clientScript, markdownDiv]);
+
+                          //React.createElement(ReactMarkdown, {markdown: data.toString()}, null);
+
+                          var markdownDocument = React.createElement(HTMLDocument.default, {title: checkPath4}, markdownHtml);
+
                           console.log("CHEESE", markdownHtml, markdownDocument);
                           data = ReactDOMServer.renderToStaticMarkup(markdownDocument);
                           contentType = 'text/html';
@@ -501,10 +516,10 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                       return resolve({resolution: "up-to-date", data: data, contentType: contentType});
                     });
                   } else if (trimmedLine.endsWith(': FAILED')) {
-                    console.log("WTF--------");
-                    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
-                      return resolve({resolution: "updated", version: newFileVersion});
-                    });
+                    console.log("-------------WTF--------");
+                    //promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
+                    //  return resolve({resolution: "updated", version: newFileVersion});
+                    //});
                   } else {
                     console.log("FART");
                     return reject(trimmedLine);
@@ -512,20 +527,23 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                 }
                 cb();
               }));
+
               shaCheckingProcess.stderr.pipe(es.split()).pipe(es.map(function (data, cb) {
                 var trimmedLine = data.trim();
                 if (0 != trimmedLine.length) {
-                  console.log("shasum error: " + trimmedLine, checkPath, existingFile, config['staticFileCabinetDirectory']);
+                  console.log("shasum error: " + trimmedLine, checkPathFoo, existingFile, config['staticFileCabinetDirectory']);
 
-                    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
-                      return resolve({resolution: "updated", version: newFileVersion});
-                    });
+                    //promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
+                    //  return resolve({resolution: "updated", version: newFileVersion});
+                    //});
                 }
                 cb();
               }));
             }
           });
         }
+
+        console.log("FOOOOSDSDSKJDHSKDHSJKDH");
       });
     })
   })
@@ -533,8 +551,9 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
 
 
 var vfcHandler = function(req, res, next) {
-  console.log("requesting V", req.query.v);
+  console.log("ZZZZZZZrequesting V", req.query.v);
 
+  //function(pathToHandle, desiredVersion)
   promiseToHandlePath(req.path.substring(1, req.path.length), req.query.v).then(function(handledPathResult) {
     console.log(handledPathResult);
     if ("updated" === handledPathResult.resolution) {
@@ -623,7 +642,8 @@ var promiseToListenForHttpRequests = function() {
         });
       });
     });
-    app.use(vfcHandler);
+    //WTF???
+    //app.use(vfcHandler);
     //app.use(express.static(path.dirname(config['-f']) + '/' + config['publicDir']));
     console.log("full config", config);
     return resolve(app.listen(config['-p'], config['-h']));
