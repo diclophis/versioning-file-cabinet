@@ -1,0 +1,15 @@
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    ingress.class: wkndr
+  name: vfc-vhost
+spec:
+  rules:
+  - host: vfc.bardin.haus
+    http:
+      paths:
+      - backend:
+          serviceName: vfc
+          servicePort: 3001

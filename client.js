@@ -1,5 +1,6 @@
 "use strict";
 
+
 var React = require('react');
 var ReactDOM = require('react-dom');
 var ReactUpdate = require('react-addons-update');
@@ -117,5 +118,6 @@ if (app = document.getElementById("versioning-file-cabinet")) {
 
 
 var stylesheets = require("./style.css");
+
 
 console.log("got clientside");

@@ -1,0 +1,16 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vfc
+  labels:
+    run: vfc
+spec:
+  type: NodePort
+  selector:
+    run: vfc
+  ports:
+  - protocol: TCP
+    name: app
+    port: 3001
+    nodePort: 32091
