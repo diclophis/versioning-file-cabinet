@@ -15,7 +15,7 @@ var marked = require('marked');
 var React = require('react');
 var ReactDOM = require('react-dom');
 var ReactDOMServer = require('react-dom/server');
-var HTMLDocument = require('react-html-document');
+//var HTMLDocument = require('react-html-document');
 
 
 //TODO: move all config into module
@@ -62,6 +62,19 @@ config['-f'] = config['-f'] || 'Folderfile';
 config['-h'] = config['-h'] || '0.0.0.0';
 config['-c'] = null;
 //config['publicDir'] = "public";
+
+var HTMLDocument = React.createClass({
+  getInitialState: function() {
+    return {
+    };
+  },
+  render() {
+    var headEl = React.createElement("head", {});
+    var bodyEl = React.createElement("body", {}, this.props.children);
+
+    return (React.createElement("html", {}, [headEl, bodyEl]));
+  }
+});
 
 
 //TODO: flesh out list of bad filenames
@@ -249,7 +262,7 @@ var promiseToRenderIndexHtml = function() {
     var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
     var versioningFileCabinetDiv = React.createElement("div", {id: "versioning-file-cabinet", key: "versioning-file-cabinet"}, null);
     var otherDiv = React.createElement("div", {key: "other-div"}, [versioningFileCabinetDiv, clientScript]);
-    var indexDocument = React.createElement(HTMLDocument.default, {title: "versioning-file-cabinet"}, otherDiv);
+    var indexDocument = React.createElement(HTMLDocument, {title: "versioning-file-cabinet"}, otherDiv);
     return resolve(ReactDOMServer.renderToStaticMarkup(indexDocument));
   });
 };
@@ -399,10 +412,10 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                         case 'text/markdown':
                         case 'text/x-markdown':
                           var htmlFromMarkdown = marked.parse(data.toString());
-                          var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
+                          //var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
                           var markdownDiv = React.createElement("div", {key: "markdown-container", dangerouslySetInnerHTML: {__html: htmlFromMarkdown}}, null);
-                          var markdownHtml = React.createElement("div", {id: "markdown"}, [clientScript, markdownDiv]);
-                          var markdownDocument = React.createElement(HTMLDocument.default, {title: checkPathBop}, markdownHtml);
+                          var markdownHtml = React.createElement("div", {id: "markdown"}, [markdownDiv]);
+                          var markdownDocument = React.createElement(HTMLDocument, {title: checkPathBop}, markdownHtml);
 
                           data = ReactDOMServer.renderToStaticMarkup(markdownDocument);
                           contentType = 'text/html';

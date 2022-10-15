@@ -21,7 +21,6 @@
     "react": "~15.0",
     "react-addons-update": ">0.0",
     "react-dom": "~15.0",
-    "react-html-document": "~3.1",
     "style-loader": ">0.0",
     "webpack": "^5.0"
   },
