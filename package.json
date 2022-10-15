@@ -18,9 +18,9 @@
     "marked": ">0.0",
     "memory-fs": ">0.0",
     "mime-types": ">0.0",
-    "react": "~16.0",
+    "react": "~18.0",
     "react-addons-update": ">0.0",
-    "react-dom": "~16.0",
+    "react-dom": "~18.0",
     "style-loader": ">0.0",
     "webpack": "^5.0"
   },
