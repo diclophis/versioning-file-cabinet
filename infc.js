@@ -122,6 +122,8 @@ var promiseToCompileMainJs = function() {
 
 
 var promiseToGetListOfVersions = function(path) {
+//error listing versions [Error: ENOENT: no such file or directory, scandir 'doc/.sfc/.index/VERSIONS/doc/.sfc/doc/foo2.md'] {
+
   return new Promise(function(resolve, reject) {
     fs.readdir(config['staticFileCabinetDirectory'] + "/VERSIONS/" + path, function(err, files) {
       if (err) { return reject(err); }
@@ -132,20 +134,20 @@ var promiseToGetListOfVersions = function(path) {
 
 
 var promiseToSetResolvedFolderfilePath = function() {
-  console.log("set resolved folderfilepath");
+  //console.log("set resolved folderfilepath");
 
   return new Promise(function(resolve, reject) {
     fs.realpath(config['-f'], function(err, fullFolderfilePath) {
       if (err) { return reject(err); }
-      console.log("the full fullFolderfilePath", fullFolderfilePath);
+      //console.log("the full fullFolderfilePath", fullFolderfilePath);
 
       fs.readFile(fullFolderfilePath, "utf8", function(err, data) {
         if (err) { return reject(err); }
         var dataTrimmed = data.trim();
 
-        console.log("found", dataTrimmed);
+        //console.log("found", dataTrimmed);
         config['resolvedFolerfileDirname'] = dataTrimmed;
-        console.log("... setres", config);
+        //console.log("... setres", config);
 
         resolve(fullFolderfilePath);
       });
@@ -155,23 +157,27 @@ var promiseToSetResolvedFolderfilePath = function() {
 
 
 var promiseToCreateStaticFileCabinetDirectory = function() {
-  console.log("promiseToCreateStaticFileCabinetDirectory begin");
+  //console.log("promiseToCreateStaticFileCabinetDirectory begin");
   return new Promise(function(resolve, reject) {
-    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/.sfc";
+    config['staticFileCabinetDirectory'] = config['resolvedFolerfileDirname'] + "/.sfc/.index";
+    config['staticFileCabinetDirectoryLatest'] = config['resolvedFolerfileDirname'] + "/.sfc";
+
     fs.access(config['staticFileCabinetDirectory'], fs.R_OK | fs.W_OK, function (err) {
-      console.log("staticFileCabinetDirectory ISSUE?", err, config);
+      //console.log("staticFileCabinetDirectory ISSUE?", err, config);
 
       if (err) {
         var mkdirSfc = spawn("mkdir", ["-p", config['staticFileCabinetDirectory']]);
-        console.log("mkdir sfc", config['staticFileCabinetDirectory']);
+        //console.log("mkdir sfc", config['staticFileCabinetDirectory']);
 
         mkdirSfc.stdout.on('close', function(err) {
-          console.log("wtf!!!!", err);
+          //console.log("wtf!!!!", err);
+
           if (err) { return reject(err); }
           return resolve(config['staticFileCabinetDirectory']);
         });
       } else {
-        console.log("end promiseToCreateStaticFileCabinetDirectory");
+        //console.log("end promiseToCreateStaticFileCabinetDirectory");
+
         return resolve(config['staticFileCabinetDirectory']);
       }
     });
@@ -185,11 +191,21 @@ var promiseToWatchFilesFromFolders = function(allFiles, validDirsToWatch, sendFi
       if (!isOkFilename(interestingFile)) {
         return reject();
       }
+
       console.log("V is null", interestingFile);
 
       promiseToHandlePath(interestingFile, null).then(function(handledPathResult) {
+
+//error listing versions [Error: ENOENT: no such file or directory, scandir 'doc/.sfc/.index/VERSIONS/doc/.sfc/doc/foo2.md'] {
+//WTF123123 doc/foo2.md { resolution: 'updated', version: null }
+//WTF123123 doc/.sfc/doc/foo2.md {
+//  resolution: 'up-to-date',
+
+console.log("WTF123123", interestingFile, handledPathResult);
+
         promiseToGetListOfVersions(interestingFile).then(function(allVersions) {
-          console.log("sending", interestingFile);
+          //console.log("sending", interestingFile);
+
           sendFile(interestingFile, allVersions);
           resolve();
         }).catch(function(err) {
@@ -204,13 +220,14 @@ var promiseToWatchFilesFromFolders = function(allFiles, validDirsToWatch, sendFi
   var foop = function(iallFiles) {
     var allP = [];
     iallFiles.forEach(function(interestingFile) {
+      console.log("FOOOO37", interestingFile);
+
       allP.push(inspectFile(interestingFile));
     });
     return Promise.all(allP);
   };
   return foop(allFiles).then(function() {
     validDirsToWatch.forEach(function(validDirAndTildeScape, index, array) {
-
       console.log("WTF is a tildeScape????", validDirAndTildeScape);
 
       // WTF is a tildeScape???? [ 'Folderfile.example', 'doc' ]
@@ -227,7 +244,7 @@ var promiseToWatchFilesFromFolders = function(allFiles, validDirsToWatch, sendFi
         }
         waiter = setTimeout(function() {
           promiseToListAllFilesToSync().then(function(allFiles) {
-            console.log("foop", allFiles);
+            console.log("foop all Files found", allFiles);
 
             foop(allFiles);
           }).catch(function(err) {
@@ -279,9 +296,9 @@ var promiseToRenderIndexHtml = function() {
     var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
     var versioningFileCabinetDiv = React.createElement("div", {id: "versioning-file-cabinet", key: "versioning-file-cabinet"}, null);
     var otherDiv = React.createElement("div", {key: "other-div"}, [versioningFileCabinetDiv, clientScript]);
-    console.log("a", HTMLDocument);
+    //console.log("a", HTMLDocument);
     var indexDocument = React.createElement(HTMLDocument.default, {title: "versioning-file-cabinet"}, otherDiv);
-    console.log("b");
+    //console.log("b");
     return resolve(ReactDOMServer.renderToStaticMarkup(indexDocument));
   });
 };
@@ -291,7 +308,7 @@ var promiseToListAllFilesToSync = function() {
   var allFilesToSync = [];
   var allFileListingProcessPromises = [];
   return promiseToListFolderfilesToSync().then(function(foldersToSync) {
-    console.log("foldersToSync", foldersToSync);
+    //console.log("foldersToSync", foldersToSync);
 
     foldersToSync.forEach(function(folderToSyncAndTildeScape) {
 
@@ -305,7 +322,7 @@ var promiseToListAllFilesToSync = function() {
 
       //TODO: !!!!!
       var fileListingProcessPromise = new Promise(function(res, rej) {
-        var findArgs = [folderToSync, "-path", config['staticFileCabinetDirectory'], "-prune", "-false", "-o", "-type", "f,l"];
+        var findArgs = [folderToSync, "-path", config['staticFileCabinetDirectoryLatest'], "-prune", "-false", "-o", "-type", "f,l"];
 
         //find . -path ./.git -prune -o -print -type f
         //find . -path ./.git -prune -false -o -type f
@@ -314,9 +331,8 @@ var promiseToListAllFilesToSync = function() {
         console.log("find these files", "find", findArgs);
 
         fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
-
           if (stringPresent(data) && folderToSync != data) {
-            console.log("AAA", data);
+            //console.log("AAA", data);
 
             var canonFile = folderToSyncPrefix + data.replace(folderToSync, '');
             allFilesToSync.push(canonFile);
@@ -331,24 +347,26 @@ var promiseToListAllFilesToSync = function() {
       allFileListingProcessPromises.push(fileListingProcessPromise);
     });
     return Promise.all(allFileListingProcessPromises).then(function() {
-      console.log("FOOOOOO", allFilesToSync);
+      //console.log("FOOOOOO", allFilesToSync);
       return Promise.resolve(allFilesToSync);
     });
   });
 };
 
 
-var promiseToCopyFile = function(source, sfcPath, requested) {
+var promiseToCopyFile = function(source, sfcPath, sfcLatestPath, requested) {
   return new Promise(function(resolve, reject) {
-    console.log("1", source);
+    //console.log("1", source);
     fs.readFile(source, function (err, data) {
       if (err) { return reject(err); }
       var checksumOfInboundFile = checksum(data, 'sha1');
       var splitDirPath = splitChars(checksumOfInboundFile, 8).join("/");
       var target = sfcPath + "/FILES/" + splitDirPath;
+      var latestTar = sfcLatestPath;
       var versionsPath = sfcPath + "/VERSIONS/" + requested;
       var indexPath = "index" + path.extname(source);
-      var mkdirAndCopyAndSymlink = "mkdir -p " + versionsPath + " && mkdir -p " + target + " && cp " + source + " " + target + "/" + indexPath + " && mkdir -p " + path.dirname(requested) + " && export VERSION=$(echo " + splitDirPath + " | tr / -)" + " && ln -s /home/app/" + target + "/" + indexPath + " /home/app/" + versionsPath + "/$VERSION && ln -sf /home/app/" + versionsPath + "/$VERSION /home/app/" + requested + " && echo $VERSION";
+      var mkdirAndCopyAndSymlink = "mkdir -p " + versionsPath + " && mkdir -p " + target + " && cp " + source + " " + target + "/" + indexPath + " && mkdir -p " + path.dirname(requested) + " " + path.dirname("/home/app/" + latestTar + "/" + requested) + " && export VERSION=$(echo " + splitDirPath + " | tr / -)" + " && ln -s /home/app/" + target + "/" + indexPath + " /home/app/" + versionsPath + "/$VERSION && ln -sf /home/app/" + versionsPath + "/$VERSION /home/app/" + latestTar + "/" + requested + " && echo $VERSION";
+      console.log(mkdirAndCopyAndSymlink);
       var fileListingProcess = spawn("sh", ["-c", mkdirAndCopyAndSymlink]);
       var version = null;
       fileListingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
@@ -374,16 +392,16 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
     console.log("handleThis", pathToHandle, desiredVersion);
 
     if (!isOkFilename(pathToHandle)) {
-      console.log("invalidFileName", pathToHandle);
+      //console.log("invalidFileName", pathToHandle);
       return reject("invalid filename!!!!", pathToHandle);
     }
 
     var requestedTildeScape = ("/" + pathToHandle).split("/")[1];
 
-    console.log("requestTildeScape", requestedTildeScape);
+    //console.log("requestTildeScape", requestedTildeScape);
 
     promiseToListFolderfilesToSync().then(function(foldersToSyncAndTildeScapes) {
-      console.log("this is list of files", foldersToSyncAndTildeScapes);
+      //console.log("this is list of files", foldersToSyncAndTildeScapes);
 
       foldersToSyncAndTildeScapes.forEach(function(folderToSyncAndTildeScape) {
 
@@ -392,67 +410,51 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
 
         console.log("tildeScape 123", requestedTildeScape, foundTildeScape, folderToSync, requestedTildeScape);
 
-//this is list of files [ [ 'Folderfile.example', 'doc' ] ]
-//tildeScape Folderfile.example doc doc
-//tildeScape doc doc doc doc
+        //handleThis doc/foo2.md ade94d0b-0d0204d2-98d96abb-101f8e20-e60e8e70
+
+        //tildeScape 123 doc doc doc doc
+        //checkPathFoo doc/foo2.md
+        //FOOOOSDSDSKJDHSKDHSJKDH
+        //VERSION PATH /home/app/doc/foo2.md doc/foo2.md
+        //wtf shaDir /home/app/doc/foo2.md homeappdoc ade94d0b-0d0204d2-98d96abb-101f8e20-e60e8e70
+        //shasum error: shasum: standard input: no properly formatted SHA checksum lines found doc/foo2.md ./doc/foo2.md doc/.sfc/.index
+
 
         if (foundTildeScape != requestedTildeScape) {
-          console.log("FOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
-          console.log("FOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
-          console.log("FOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
           console.log("FOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
         } else {
 
           var checkPathFoo = pathToHandle;
-          console.log("checkPathFoo", checkPathFoo, versionPath);
 
-          //checkPath doc/.sfcFILES/f1d2d2f9/24e986ac/86fdf7b3/6c94bcdf/32beec15/index.md
-          //checkPathResol doc/.sfcFILES/f1d2d2f9/24e986ac/86fdf7b3/6c94bcdf/32beec15/index.md /home/app/doc/.sfcFILES/f1d2d2f9/24e986ac/86fdf7b3/6c94bcdf/32beec15/index.md ./doc/.sfcFILES/f1d2d2f9/24e986ac/86fdf7b3/6c94bcdf/32beec15/index.md
+          console.log("checkPathFoo", checkPathFoo);
 
-          fs.realpath(checkPathFoo, function(err, versionPath) {
+          fs.realpath(config['staticFileCabinetDirectoryLatest'] + "/" + checkPathFoo, function(err, versionPath) {
 
             var existingFile = path.dirname(folderToSync) + "/" + pathToHandle;
 
-            console.log("checkPathResol", checkPathFoo, versionPath, existingFile);
-
-///checkPath doc/foo.md
-///checkPathResol doc/foo.md /home/app/doc/foo.md ./doc/foo.md
-///wtf shaDir /home/app/doc/foo.md
-///shasum error: shasum: standard input: no properly formatted SHA checksum lines found
-
-
-//requesting V ffa78dae-ddf33506-127bcb1b-45ca41b5-28346c70
-//handleThis doc/foo2.md ffa78dae-ddf33506-127bcb1b-45ca41b5-28346c70
-//requestTildeScape doc
-//this is list of files [ [ 'doc', 'doc' ] ]
-//tildeScape doc doc doc doc
-//checkPath doc/foo2.md
-//checkPathResol doc/foo2.md /home/app/doc/.sfc/FILES/23069de9/0b647771/89969bde/a04e1efe/608b2765/index.md ./doc/foo2.md
-//wtf shaDir /home/app/23069de9/0b647771/89969bde/a04e1efe/608b2765/index.md
-//shasum error: shasum: standard input: no properly formatted SHA checksum lines found doc/foo2.md ./doc/foo2.md doc/.sfc
+            //console.log("checkPathResol", checkPathFoo, versionPath, existingFile);
 
             if (err) {
               console.log("foopBasdasd", err);
 
-              //if ('ENOENT' === err.code) {
-              //    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
-              //      return resolve({resolution: "updated", version: newFileVersion});
-              //    }).catch(function(err) {
-              //      return reject(err);
-              //    });
-              //} else {
-              //  return reject(err);
-              //}
+              if ('ENOENT' === err.code) {
+                  //promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
+                  //  return resolve({resolution: "updated", version: newFileVersion});
+                  //})
+                  promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], config['staticFileCabinetDirectoryLatest'], checkPathFoo).then(function(newFileVersion) {
+                    return resolve({resolution: "updated", version: newFileVersion});
+                  }).catch(function(err) {
+                    return reject(err);
+                  });
+              } else {
+                return reject(err);
+              }
 
             } else {
-
-            console.log("VERSION PATH", versionPath);
+              console.log("VERSION PATH", versionPath, checkPathFoo, existingFile);
 
               // desiredVersion
               var shaDir = versionPath.replace("/home/app/" + config['staticFileCabinetDirectory'] + "/FILES/", "");
-
-              //wtf shaDir /home/app/23069de9/0b647771/89969bde/a04e1efe/608b2765/index.md
-              //wtf shaDir /home/multipass/workspace/versioning-file-cabinet/doc/README.md
 
               var shaParts = shaDir.split("/");
               shaParts.pop();
@@ -460,54 +462,49 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
               var shaCheckingProcess = spawn("shasum", ["-c", "-"]);
               var shaSumInput = shasum + "  " + existingFile + "\n";
 
-              console.log("wtf shaDir", shaDir, shasum);
+console.log("shasumInput", shaSumInput);
 
-//checkPathResol doc/foo2.md /home/app/doc/foo2.md ./doc/foo2.md
-//wtf shaDir /home/app/doc/foo2.md homeappdoc
-//shasum error: shasum: standard input: no properly formatted SHA checksum lines found doc/foo2.md ./doc/foo2.md doc/.sfc
-
+              console.log("wtf shaDir", shaDir, shasum, desiredVersion);
 
               shaCheckingProcess.stdin.write(shaSumInput);
               shaCheckingProcess.stdin.end();
               shaCheckingProcess.stdout.pipe(es.split()).pipe(es.map(function (data, cb) {
                 var trimmedLine = data.trim();
+                console.log(trimmedLine);
                 if (0 != trimmedLine.length) {
                   if (trimmedLine.endsWith(': OK')) {
                     var contentType = (lookup(checkPathFoo) || 'application/octet-stream');
-                    var checkPath4 = null;
+                    var checkPathBop = null;
+
                     if (desiredVersion) {
-                      checkPath4 = config['staticFileCabinetDirectory'] + "/VERSIONS/" + pathToHandle + "/" + desiredVersion;
+                      checkPathBop = config['staticFileCabinetDirectory'] + "/VERSIONS/" + pathToHandle + "/" + desiredVersion;
                     } else {
                       //checkPath = config['resolvedFolerfileDirname'] + "/" + pathToHandle;
                       //TODO: safety checks
-                      checkPath4 = pathToHandle;
+                      //checkPathBop = config['staticFileCabinetDirectoryLatest'] + "/" + pathToHandle;
+                      //checkPathBop = config['staticFileCabinetDirectoryLatest'] + "/" + pathToHandle;
+                      checkPathBop = pathToHandle;
                     }
 
-//wtf shaDir f1d2d2f9/24e986ac/86fdf7b3/6c94bcdf/32beec15/index.md f1d2d2f924e986ac86fdf7b36c94bcdf32beec15
-//2 doc/public/doc/foo2.md
+                    console.log("2", checkPathFoo, checkPathBop, pathToHandle);
 
-
-                    console.log("2", checkPathFoo, checkPath4);
-                    fs.readFile(checkPath4, function (err, data) {
+                    fs.readFile(checkPathBop, function (err, data) {
                       if (err) { console.log(err); return reject(err); }
                       switch(contentType) {
                         case 'text/markdown':
                         case 'text/x-markdown':
-                          console.log("HTMLDoc", HTMLDocument);
-
-                          console.log("ReactMarkdown", marked);
-
-    var htmlFromMarkdown = marked.parse(data.toString());
-    var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
-    var markdownDiv = React.createElement("div", {key: "markdown-container", dangerouslySetInnerHTML: {__html: htmlFromMarkdown}}, null);
+                          var htmlFromMarkdown = marked.parse(data.toString());
+                          var clientScript = React.createElement("script", {src: "?interfaceJavascript", key: "js"}, null);
+                          var markdownDiv = React.createElement("div", {key: "markdown-container", dangerouslySetInnerHTML: {__html: htmlFromMarkdown}}, null);
 
                           var markdownHtml = React.createElement("div", {id: "markdown"}, [clientScript, markdownDiv]);
 
                           //React.createElement(ReactMarkdown, {markdown: data.toString()}, null);
 
-                          var markdownDocument = React.createElement(HTMLDocument.default, {title: checkPath4}, markdownHtml);
+                          var markdownDocument = React.createElement(HTMLDocument.default, {title: checkPathBop}, markdownHtml);
 
-                          console.log("CHEESE", markdownHtml, markdownDocument);
+                          //console.log("CHEESE", markdownHtml, markdownDocument);
+
                           data = ReactDOMServer.renderToStaticMarkup(markdownDocument);
                           contentType = 'text/html';
                         break;
@@ -517,11 +514,13 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                     });
                   } else if (trimmedLine.endsWith(': FAILED')) {
                     console.log("-------------WTF--------");
+                    promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], config['staticFileCabinetDirectoryLatest'], checkPathFoo).then(function(newFileVersion) {
+                      return resolve({resolution: "updated", version: newFileVersion});
+                    });
                     //promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
                     //  return resolve({resolution: "updated", version: newFileVersion});
                     //});
                   } else {
-                    console.log("FART");
                     return reject(trimmedLine);
                   }
                 }
@@ -533,9 +532,10 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                 if (0 != trimmedLine.length) {
                   console.log("shasum error: " + trimmedLine, checkPathFoo, existingFile, config['staticFileCabinetDirectory']);
 
-                    //promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], checkPath).then(function(newFileVersion) {
+                    //promiseToCopyFile(existingFile, config['staticFileCabinetDirectory'], config['staticFileCabinetDirectoryLatest'], checkPathFoo).then(function(newFileVersion) {
                     //  return resolve({resolution: "updated", version: newFileVersion});
                     //});
+
                 }
                 cb();
               }));
@@ -555,7 +555,7 @@ var vfcHandler = function(req, res, next) {
 
   //function(pathToHandle, desiredVersion)
   promiseToHandlePath(req.path.substring(1, req.path.length), req.query.v).then(function(handledPathResult) {
-    console.log(handledPathResult);
+    //console.log(handledPathResult);
     if ("updated" === handledPathResult.resolution) {
       res.set('Content-Type', 'text/html');
       return res.redirect(req.path + "?v=" + handledPathResult.version);
@@ -581,7 +581,7 @@ var promiseToListenForHttpRequests = function() {
       var isInterfaceJavascript = '' === req.query.interfaceJavascript;
       var redirectToIndexHtml = isRoot && app.get('env') != 'development' && !isInterfaceJavascript;
       var respondWithInterfaceHtml = isRoot && app.get('env') === 'development' && !isInterfaceJavascript;
-      console.log(isRoot, isInterfaceJavascript, redirectToIndexHtml, respondWithInterfaceHtml);
+      //console.log(isRoot, isInterfaceJavascript, redirectToIndexHtml, respondWithInterfaceHtml);
       if (redirectToIndexHtml) {
         res.redirect('/index.html');
       } else if (respondWithInterfaceHtml) {
@@ -636,16 +636,18 @@ var promiseToListenForHttpRequests = function() {
       //TODO: !!!
       req.on("close", function() { });
       promiseToListAllFilesToSync().then(function(allFiles) {
-        console.log("this is all of the files", allFiles);
+        //console.log("this is all of the files", allFiles);
         return promiseToListFolderfilesToSync().then(function(foldersToSync) {
+          console.log("should do a watch on", allFiles, foldersToSync);
+
           return promiseToWatchFilesFromFolders(allFiles, foldersToSync, sendFile);
         });
       });
     });
     //WTF???
-    //app.use(vfcHandler);
+    app.use(vfcHandler);
     //app.use(express.static(path.dirname(config['-f']) + '/' + config['publicDir']));
-    console.log("full config", config);
+    //console.log("full config", config);
     return resolve(app.listen(config['-p'], config['-h']));
   });
 };
