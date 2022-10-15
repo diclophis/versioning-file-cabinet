@@ -20,9 +20,9 @@ var HTMLDocument = require('react-html-document');
 
 //TODO: move all config into module
 var webpackConfig = {
-  node: {
-    console: true,
-  },
+  //node: {
+  //  console: true,
+  //},
   entry: [ path.dirname(__filename) + "/client.js"],
   output: {
     path: '/',
