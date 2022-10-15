@@ -63,18 +63,16 @@ config['-h'] = config['-h'] || '0.0.0.0';
 config['-c'] = null;
 //config['publicDir'] = "public";
 
-var HTMLDocument = React.createClass({
-  getInitialState: function() {
-    return {
-    };
-  },
+//var HTMLDocument = React.createClass({
+
+class HTMLDocument extends React.Component {
   render() {
-    var headEl = React.createElement("head", {});
-    var bodyEl = React.createElement("body", {}, this.props.children);
+    var headEl = React.createElement("head", {key: 'head-el'});
+    var bodyEl = React.createElement("body", {key: 'body-el'}, this.props.children);
 
     return (React.createElement("html", {}, [headEl, bodyEl]));
   }
-});
+}
 
 
 //TODO: flesh out list of bad filenames
@@ -263,7 +261,7 @@ var promiseToRenderIndexHtml = function() {
     var versioningFileCabinetDiv = React.createElement("div", {id: "versioning-file-cabinet", key: "versioning-file-cabinet"}, null);
     var otherDiv = React.createElement("div", {key: "other-div"}, [versioningFileCabinetDiv, clientScript]);
     var indexDocument = React.createElement(HTMLDocument, {title: "versioning-file-cabinet"}, otherDiv);
-    return resolve(ReactDOMServer.renderToStaticMarkup(indexDocument));
+    return resolve("<!DOCTYPE html>" + ReactDOMServer.renderToStaticMarkup(indexDocument));
   });
 };
 
@@ -417,7 +415,7 @@ var promiseToHandlePath = function(pathToHandle, desiredVersion) {
                           var markdownHtml = React.createElement("div", {id: "markdown"}, [markdownDiv]);
                           var markdownDocument = React.createElement(HTMLDocument, {title: checkPathBop}, markdownHtml);
 
-                          data = ReactDOMServer.renderToStaticMarkup(markdownDocument);
+                          data = "<!DOCTYPE html>" + ReactDOMServer.renderToStaticMarkup(markdownDocument);
                           contentType = 'text/html';
 
                           break;

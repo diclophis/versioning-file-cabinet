@@ -25,21 +25,25 @@ var bindFilesystemEventInterface = function(reactComp) {
 };
 
 
-var Client = React.createClass({
-  getInitialState: function() {
+//var Client = React.createClass({
+class Client extends React.Component {
+  constructor(props) {
+    super(props);
+
     //TODO: !!!!
     var preloadedSrc = window.location.search;
     preloadedSrc = preloadedSrc.replace("#", "");
     preloadedSrc = preloadedSrc.replace("?", "");
-    return {
+    this.state = {
       resourceFrameSrc: preloadedSrc.length > 0 ? preloadedSrc : null,
       files: {},
       selectedVersions: {},
-      onResourceClicked: this.onResourceClicked,
-      onVersionChanged: this.onVersionChanged
+      //onResourceClicked: this.onResourceClicked,
+      //onVersionChanged: this.onVersionChanged
     };
-  },
-  componentWillMount: function() {
+  }
+
+  componentWillMount() {
     bindFilesystemEventInterface(this);
     //TODO: !!!!
     window.onpopstate = function(event) {
@@ -52,13 +56,15 @@ var Client = React.createClass({
       //console.log(event.newURL, event);
       //this.setState({resourceFrameSrc: window.location.hash.replace("#", "")});
     }.bind(this);
-  },
-  onResourceClicked: function(ev) {
+  }
+
+  onResourceClicked(ev) {
     //ev.preventDefault();
     //this.setState({resourceFrameSrc: ev.target.dataset.filename});
     //this.onKeepHistorySynced(ev.target.dataset.filename);
-  },
-  onVersionChanged: function(ev) {
+  }
+
+  onVersionChanged(ev) {
     var setList = {};
     setList[ev.target.dataset.filename] = ev.target.value;
     var nestedSet = { $merge: setList }
@@ -79,23 +85,25 @@ var Client = React.createClass({
         }
       }
     }
-  },
-  onKeepHistorySynced: function(intendedResource) {
+  }
+
+  onKeepHistorySynced(intendedResource) {
     //history.pushState({frame: intendedResource}, intendedResource, null);
     //console.log(intendedResource);
     //window.location.hash = intendedResource;
-  },
-  render: function() {
+  }
+
+  render() {
     var resourceLinks = [];
     var filenames = Object.keys(this.state.files);
     console.log("filenames", filenames);
     filenames.sort().forEach(function(filename) {
       var versionInputs = [];
-      var link = React.createElement("a", {key: filename, "data-filename": filename, href: "?" + filename, onClick: this.onResourceClicked}, filename);
+      var link = React.createElement("a", {key: filename, "data-filename": filename, href: "?" + filename, onClick: this.onResourceClicked.bind(this)}, filename);
       versionInputs.push(link);
       var selectedIndex = this.state.selectedVersions[filename] || this.state.files[filename].versions[(this.state.files[filename].versions.length - 1)];
       this.state.files[filename].versions.forEach(function(version) {
-        var versionInput = React.createElement("input", {onMouseOver: this.onVersionChanged, onChange: this.onVersionChanged, "data-filename": filename, key: version, type: "radio", value: version, checked: selectedIndex === version}, null);
+        var versionInput = React.createElement("input", {onMouseOver: this.onVersionChanged.bind(this), onChange: this.onVersionChanged.bind(this), "data-filename": filename, key: version, type: "radio", value: version, checked: selectedIndex === version}, null);
         versionInputs.push(versionInput);
       }.bind(this));
       var resourceLink = React.createElement("form", {id: filename, key: filename}, versionInputs);
@@ -107,7 +115,7 @@ var Client = React.createClass({
     }
     return React.createElement("div", null, resourceLinks);
   }
-});
+}
 
 
 //NOTE: bind event handler component only if need-be
