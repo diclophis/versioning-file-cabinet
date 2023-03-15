@@ -22,7 +22,7 @@
     "react-addons-update": ">0.0",
     "react-dom": "~18.0",
     "style-loader": ">0.0",
-    "webpack": "^5.0"
+    "webpack": "^5.76"
   },
   "scripts": {
     "test": "node infc.js -t"
